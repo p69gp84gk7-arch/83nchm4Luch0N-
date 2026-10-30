@@ -70,6 +70,35 @@ Les modes disponibles dans **Run workflow** :
 | `normal` | collecte complète maintenant | ~4 requêtes (+8 le jour des fiches) |
 | `fiches` | collecte complète + fiches détaillées de tous les hôtels | ~12 requêtes |
 | `quota` | affiche seulement le compteur SerpApi | gratuit |
+| `auto` | collecte du jour seulement si elle n'a pas encore été faite (utilisé par la page) | ~4 requêtes, ou 0 si déjà faite |
+
+---
+
+## Lancer la collecte quand j'ouvre la page (facultatif)
+
+Sans réglage, le robot passe **chaque matin**. Vous pouvez aussi demander à la page de le réveiller
+**quand vous l'ouvrez**, si la collecte du jour n'a pas encore été faite.
+
+**Réglage, une fois par appareil (ordinateur, téléphone…)** :
+1. Sur la page, cadre « Collecte », cliquez **« Lancer à l'ouverture… »**.
+2. Suivez les 5 étapes affichées pour créer une **clé GitHub** (« fine-grained personal access token ») :
+   - accès à **ce dépôt seulement** ;
+   - permissions **Actions : Read and write** et **Contents : Read-only** ;
+   - expiration : 1 an (il faudra en recréer une ensuite ; la page vous préviendra : « clé refusée »).
+3. Collez la clé, cliquez **« Enregistrer sur cet appareil »**.
+
+**Ensuite, à chaque ouverture de la page** :
+- collecte du jour déjà faite → la page l'indique (« ✓ Collecte du jour déjà faite ») et **ne relance rien** ;
+- pas encore faite → la page lance le robot, affiche « Collecte en cours… » (environ 1 minute), puis se met à jour toute seule ;
+- la collecte a échoué → la page affiche un lien vers le compte rendu et **ne réessaie pas toute seule**.
+
+Ouvrir la page dix fois dans la journée ne coûte donc **rien de plus** : une seule collecte par jour.
+Le bouton **« Relancer maintenant »** force une nouvelle collecte (il demande confirmation, car elle coûte environ 4 requêtes).
+
+**Sécurité** : la clé est rangée seulement dans le navigateur de l'appareil, jamais dans le dépôt.
+Elle ne permet que de lancer le robot et de lire les fichiers de ce dépôt.
+Pour l'effacer : « Clé GitHub… » → « Oublier la clé ». Pour l'annuler partout : supprimez-la sur
+<https://github.com/settings/personal-access-tokens>.
 
 ---
 
