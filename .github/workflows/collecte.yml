@@ -18,6 +18,7 @@ on:
           - normal    # collecte complète
           - fiches    # collecte complète + fiches détaillées
           - quota     # affiche seulement le compteur (gratuit)
+          - auto      # collecte du jour si pas encore faite (utilisé par la page web)
 
 permissions:
   contents: write   # autorise le robot à enregistrer les CSV

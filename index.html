@@ -110,6 +110,35 @@
   .fiche a { color: var(--accent); }
   .vide { color: var(--texte-2); padding: 16px 0; }
   footer { color: var(--texte-3); font-size: 0.8rem; margin-top: 24px; }
+
+  /* Collecte à l'ouverture */
+  .tuile .petit { font-size: 0.95rem; font-weight: 500; margin-top: 2px; }
+  #statut-collecte.ok { color: var(--baisse); }
+  #statut-collecte.erreur { color: var(--hausse); }
+  #statut-collecte a { color: var(--accent); }
+  .boutons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .bouton {
+    font: inherit; font-size: 0.85rem; border: 1px solid var(--trait); background: var(--fond);
+    color: var(--texte); border-radius: 8px; padding: 5px 10px; min-height: 32px; cursor: pointer;
+  }
+  .bouton.principal { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .bouton[disabled] { opacity: 0.5; cursor: default; }
+  .tourne { display: inline-block; width: 0.8em; height: 0.8em; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: tourne 0.8s linear infinite; vertical-align: -1px; margin-right: 4px; }
+  @keyframes tourne { to { transform: rotate(360deg); } }
+  dialog {
+    background: var(--carte); color: var(--texte); border: 1px solid var(--trait); border-radius: 12px;
+    padding: 20px; max-width: min(520px, calc(100vw - 32px));
+  }
+  dialog::backdrop { background: rgb(0 0 0 / 0.45); }
+  dialog h2 { margin-bottom: 8px; }
+  dialog ol { padding-left: 20px; margin: 8px 0 12px; font-size: 0.9rem; }
+  dialog li { margin-bottom: 4px; }
+  dialog a { color: var(--accent); }
+  dialog input[type="password"] {
+    width: 100%; font: inherit; color: var(--texte); background: var(--fond);
+    border: 1px solid var(--trait); border-radius: 8px; padding: 8px; min-height: 40px;
+  }
+  #dlg-message { min-height: 1.4em; font-size: 0.9rem; margin: 8px 0 0; }
 </style>
 </head>
 <body>
@@ -127,7 +156,22 @@
       <div class="valeur" id="quota">—</div>
       <div class="jauge"><div id="quota-jauge" style="width:0"></div></div>
     </div>
+    <div class="tuile">
+      <div class="etiquette">Collecte</div>
+      <div class="petit" id="statut-collecte" aria-live="polite">Chaque matin, automatiquement.</div>
+      <div class="boutons">
+        <button type="button" class="bouton" id="b-relancer" hidden>Relancer maintenant</button>
+        <button type="button" class="bouton" id="b-connexion">Lancer à l'ouverture…</button>
+      </div>
+    </div>
   </div>
+
+  <section class="carte" id="vide" hidden>
+    <h2>Pas encore de données</h2>
+    <p class="aide" style="margin:0">Le robot n'a pas encore fait sa première collecte. Il la fera tout seul demain matin.
+      Pour la lancer tout de suite : bouton « Lancer à l'ouverture… » ci-dessus (une fois pour toutes),
+      ou dans GitHub, onglet <em>Actions</em> → <em>Collecte quotidienne</em> → <em>Run workflow</em>.</p>
+  </section>
 
   <section class="carte">
     <div class="filtres">
@@ -160,6 +204,28 @@
     <div id="cartes" class="cartes-comparees"></div>
   </section>
 
+  <dialog id="dlg-github">
+    <form method="dialog">
+      <h2>Lancer la collecte à l'ouverture de la page</h2>
+      <p class="aide" style="margin:0">Pour que cette page puisse réveiller le robot, elle a besoin d'une « clé GitHub ».
+        La clé reste <strong>uniquement sur cet appareil</strong> (à refaire sur votre téléphone et votre ordinateur).</p>
+      <ol>
+        <li>Ouvrez <a id="lien-cle" target="_blank" rel="noopener">la page de création de clé GitHub</a> (connecté à votre compte).</li>
+        <li><em>Token name</em> : « Veille Luchon ». <em>Expiration</em> : 1 an.</li>
+        <li><em>Repository access</em> : <strong>Only select repositories</strong> → choisissez <strong id="nom-depot"></strong>.</li>
+        <li><em>Permissions</em> → <em>Repository permissions</em> : <strong>Actions : Read and write</strong> et <strong>Contents : Read-only</strong>.</li>
+        <li>Cliquez <em>Generate token</em>, copiez la clé (elle commence par <code>github_pat_</code>) et collez-la ici :</li>
+      </ol>
+      <input type="password" id="dlg-cle" autocomplete="off" placeholder="github_pat_…" aria-label="Clé GitHub">
+      <p id="dlg-message"></p>
+      <div class="boutons">
+        <button type="button" class="bouton principal" id="dlg-ok">Enregistrer sur cet appareil</button>
+        <button type="button" class="bouton" id="dlg-oublier" hidden>Oublier la clé</button>
+        <button type="submit" class="bouton">Fermer</button>
+      </div>
+    </form>
+  </dialog>
+
   <footer>Données : Google Hotels via SerpApi. Note sur 10 = note Google sur 5 × 2. « non indiqué » = Google ne donne pas l'information.</footer>
 </main>
 
@@ -174,13 +240,18 @@ const dateFr = (iso) => iso ? new Date(iso + "T12:00:00").toLocaleDateString("fr
 const dateCourte = (iso) => new Date(iso + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
 const echapper = (t) => String(t ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
-function chargerCsv(nom) {
-  return new Promise((ok) => {
-    Papa.parse("data/" + nom + "?v=" + Date.now(), {
-      download: true, header: true, skipEmptyLines: true,
-      complete: (r) => ok(r.data), error: () => ok([]),
-    });
-  });
+// viaGitHub = true : lit les fichiers directement dans le dépôt (juste après une collecte,
+// avant que la page publiée ne soit mise à jour, ce qui prend 1 à 2 minutes)
+async function chargerCsv(nom, viaGitHub) {
+  try {
+    const r = viaGitHub
+      ? await appelGitHub("/contents/data/" + nom + "?ref=main", { headers: { Accept: "application/vnd.github.raw" } })
+      : await fetch("data/" + nom + "?v=" + Date.now());
+    if (!r.ok) return [];
+    return Papa.parse(await r.text(), { header: true, skipEmptyLines: true }).data;
+  } catch (e) {
+    return [];
+  }
 }
 
 // Couleur fixe par hôtel (dans l'ordre de première apparition) : elle ne change jamais avec les filtres
@@ -407,10 +478,12 @@ function toutDessiner() { dessinerGraphique(); dessinerTableau(); dessinerCompar
 function remplirFiltres() {
   // Séjours, dans l'ordre d'apparition
   const sejours = [...new Set(etat.prix.map((l) => l.sejour))];
+  const choisi = $("f-sejour").value;
   $("f-sejour").innerHTML = sejours.map((s) => {
     const d = etat.prix.filter((l) => l.sejour === s).map((l) => l.date_sejour).sort().pop();
     return `<option value="${echapper(s)}">${echapper(s)}${s.startsWith("Dans") ? "" : " (" + dateCourte(d) + ")"}</option>`;
   }).join("");
+  if (sejours.includes(choisi)) $("f-sejour").value = choisi;
   const sites = [...new Set(etat.prix.map((l) => l.site))].sort((a, b) => a.localeCompare(b, "fr"));
   $("f-site").innerHTML = `<option value="">Tous (le moins cher)</option>` + sites.map((s) => `<option>${echapper(s)}</option>`).join("");
   const jours = etat.prix.map((l) => l.date_releve).sort();
@@ -421,36 +494,197 @@ function remplirFiltres() {
 
 function afficherEntete() {
   const jours = etat.prix.map((l) => l.date_releve).sort();
-  $("maj").textContent = jours.length ? dateFr(jours[jours.length - 1]) : "aucune collecte";
+  $("maj").textContent = jours.length ? dateFr(jours[jours.length - 1]) : "pas encore";
   const u = etat.usage[etat.usage.length - 1];
-  if (u && u.requetes_ce_mois) {
+  if (!u || !u.requetes_ce_mois) {
+    $("quota").textContent = "pas encore";
+  } else {
     const n = parseInt(u.requetes_ce_mois), q = parseInt(u.quota_mois) || 250;
     $("quota").textContent = `${n} / ${q}`;
     $("quota-jauge").style.width = Math.min(100, (100 * n) / q) + "%";
   }
 }
 
-async function demarrer() {
+// Charge les CSV puis dessine tout (appelé au démarrage et après une collecte)
+async function chargerEtAfficher(viaGitHub) {
   [etat.prix, etat.avis, etat.hotels, etat.usage] = await Promise.all(
-    ["prix.csv", "avis.csv", "hotels.csv", "usage.csv"].map(chargerCsv));
+    ["prix.csv", "avis.csv", "hotels.csv", "usage.csv"].map((nom) => chargerCsv(nom, viaGitHub)));
   // Ordre fixe des hôtels = ordre de première apparition (donne les couleurs)
   etat.ordreHotels = [...new Set([...etat.hotels.map((l) => l.hotel), ...etat.prix.map((l) => l.hotel)])];
   afficherEntete();
-  if (!etat.prix.length) {
-    const sections = document.querySelectorAll("section.carte");
-    sections[0].innerHTML = `<p class="vide">Aucune donnée pour l'instant. Lancez la première collecte (voir le README, étape « Premier lancement »).</p>`;
-    sections.forEach((s, i) => { if (i > 0) s.hidden = true; });
-    return;
-  }
+  const vide = !etat.prix.length;
+  $("vide").hidden = !vide;
+  document.querySelectorAll("section.carte:not(#vide)").forEach((sec) => (sec.hidden = vide));
+  if (vide) return;
   remplirFiltres();
+  // Pré-cocher les 2 premiers hôtels pour montrer le comparateur
+  if (!etat.coches.size) etat.ordreHotels.slice(0, 2).forEach((h) => etat.coches.add(h));
+  toutDessiner();
+}
+
+async function demarrer() {
   ["f-sejour", "f-debut", "f-fin", "f-site"].forEach((id) => $(id).addEventListener("change", toutDessiner));
   $("b-hotel").onclick = () => { etat.mode = "hotel"; $("b-hotel").setAttribute("aria-pressed", "true"); $("b-cat").setAttribute("aria-pressed", "false"); dessinerGraphique(); };
   $("b-cat").onclick = () => { etat.mode = "cat"; $("b-cat").setAttribute("aria-pressed", "true"); $("b-hotel").setAttribute("aria-pressed", "false"); dessinerGraphique(); };
-  // Pré-cocher les 2 premiers hôtels pour montrer le comparateur
-  etat.ordreHotels.slice(0, 2).forEach((h) => etat.coches.add(h));
-  toutDessiner();
-  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", toutDessiner);
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => etat.prix.length && toutDessiner());
+  installerConnexion();
+  await chargerEtAfficher(false);
+  verifierCollecte();
 }
+
+// =====================================================================
+//  Collecte à l'ouverture de la page (facultatif)
+//  Si une « clé GitHub » est enregistrée sur cet appareil, la page demande à
+//  GitHub de lancer le robot quand la collecte du jour n'a pas encore été faite.
+//  Sans clé, rien ne change : le robot passe quand même chaque matin.
+// =====================================================================
+const DEPOT = location.hostname.endsWith(".github.io")
+  ? { proprio: location.hostname.split(".")[0], nom: location.pathname.split("/")[1] }
+  : { proprio: "p69gp84gk7-arch", nom: "83nchm4Luch0N-" };  // quand la page est ouverte ailleurs
+const API = `https://api.github.com/repos/${DEPOT.proprio}/${DEPOT.nom}`;
+const ROBOT = "/actions/workflows/collecte.yml";
+const PAGE_ACTIONS = `https://github.com/${DEPOT.proprio}/${DEPOT.nom}/actions/workflows/collecte.yml`;
+const pause = (ms) => new Promise((ok) => setTimeout(ok, ms));
+const aujourdhui = () => new Date().toISOString().slice(0, 10);  // date UTC, comme le robot
+
+function lireCle() {
+  try { return localStorage.getItem("veille-luchon-cle-github") || ""; } catch (e) { return ""; }
+}
+function ecrireCle(cle) {
+  try { cle ? localStorage.setItem("veille-luchon-cle-github", cle) : localStorage.removeItem("veille-luchon-cle-github"); } catch (e) {}
+}
+
+function appelGitHub(chemin, options = {}, cle = lireCle()) {
+  return fetch(API + chemin, {
+    ...options,
+    cache: "no-store",
+    headers: { Accept: "application/vnd.github+json", Authorization: "Bearer " + cle, ...(options.headers || {}) },
+  });
+}
+
+function statut(html, genre = "") {
+  const el = $("statut-collecte");
+  el.className = "petit " + genre;
+  el.innerHTML = html;
+}
+
+async function verifierCollecte() {
+  const cle = lireCle();
+  $("b-connexion").textContent = cle ? "Clé GitHub…" : "Lancer à l'ouverture…";
+  $("b-relancer").hidden = !cle;
+  if (!cle) { statut("Chaque matin, automatiquement."); return; }
+
+  try {
+    // Le robot a-t-il déjà tourné (ou tourne-t-il) aujourd'hui ?
+    const r = await appelGitHub(ROBOT + "/runs?per_page=10");
+    if (r.status === 401) { statut("Clé GitHub refusée (expirée ?). Cliquez « Clé GitHub… ».", "erreur"); return; }
+    if (!r.ok) { statut("GitHub ne répond pas (" + r.status + ").", "erreur"); return; }
+    const lancements = (await r.json()).workflow_runs || [];
+    const duJour = lancements.filter((l) => l.created_at.slice(0, 10) === aujourdhui());
+    const enCours = duJour.find((l) => l.status !== "completed");
+    if (enCours) return suivre(enCours);
+    const jours = etat.prix.map((l) => l.date_releve).sort();
+    if (jours[jours.length - 1] === aujourdhui() || duJour.some((l) => l.conclusion === "success")) {
+      statut("✓ Collecte du jour déjà faite.", "ok");
+      return;
+    }
+    const echec = duJour.find((l) => l.conclusion === "failure");
+    if (echec) {
+      statut(`✗ La collecte d'aujourd'hui a échoué. <a href="${echec.html_url}" target="_blank" rel="noopener">Voir le compte rendu</a>`, "erreur");
+      return;  // on ne relance pas tout seul : il faut d'abord comprendre l'erreur
+    }
+    lancer("auto");
+  } catch (e) {
+    statut("Impossible de joindre GitHub (connexion internet ?).", "erreur");
+  }
+}
+
+// Demande à GitHub de lancer le robot, puis suit son avancement
+async function lancer(mode) {
+  $("b-relancer").disabled = true;
+  statut('<span class="tourne"></span>Lancement de la collecte…');
+  const depart = Date.now();
+  const r = await appelGitHub(ROBOT + "/dispatches", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ref: "main", inputs: { mode } }),
+  });
+  if (!r.ok) {
+    $("b-relancer").disabled = false;
+    statut(r.status === 403 || r.status === 404
+      ? "La clé GitHub n'a pas le droit de lancer le robot (permission « Actions : Read and write » ?)."
+      : "GitHub a refusé le lancement (" + r.status + ").", "erreur");
+    return;
+  }
+  // GitHub met quelques secondes à créer le lancement : on le cherche
+  for (let i = 0; i < 12; i++) {
+    await pause(5000);
+    const liste = await (await appelGitHub(ROBOT + "/runs?per_page=5&event=workflow_dispatch")).json();
+    const run = (liste.workflow_runs || []).find((l) => new Date(l.created_at).getTime() >= depart - 60000);
+    if (run) return suivre(run);
+  }
+  $("b-relancer").disabled = false;
+  statut(`Lancement demandé, mais introuvable. <a href="${PAGE_ACTIONS}" target="_blank" rel="noopener">Voir dans GitHub</a>`, "erreur");
+}
+
+async function suivre(run) {
+  $("b-relancer").disabled = true;
+  const debut = Date.now();
+  while (run.status !== "completed" && Date.now() - debut < 15 * 60000) {
+    const secondes = Math.round((Date.now() - new Date(run.created_at).getTime()) / 1000);
+    statut(`<span class="tourne"></span>Collecte en cours… (${secondes} s, environ 1 minute)`);
+    await pause(6000);
+    run = await (await appelGitHub("/actions/runs/" + run.id)).json();
+  }
+  $("b-relancer").disabled = false;
+  if (run.conclusion === "success") {
+    statut('<span class="tourne"></span>Collecte terminée, chargement des nouvelles données…');
+    await chargerEtAfficher(true);
+    statut("✓ Collecte du jour faite, page à jour.", "ok");
+  } else if (run.status !== "completed") {
+    statut(`La collecte prend plus de temps que prévu. <a href="${run.html_url}" target="_blank" rel="noopener">Voir dans GitHub</a>`, "erreur");
+  } else {
+    statut(`✗ La collecte a échoué. <a href="${run.html_url}" target="_blank" rel="noopener">Voir le compte rendu</a>`, "erreur");
+  }
+}
+
+// Fenêtre « clé GitHub »
+function installerConnexion() {
+  const dlg = $("dlg-github");
+  $("nom-depot").textContent = DEPOT.proprio + "/" + DEPOT.nom;
+  $("lien-cle").href = "https://github.com/settings/personal-access-tokens/new";
+  $("b-connexion").onclick = () => {
+    $("dlg-cle").value = "";
+    $("dlg-message").textContent = lireCle() ? "Une clé est enregistrée sur cet appareil." : "";
+    $("dlg-oublier").hidden = !lireCle();
+    dlg.showModal();
+  };
+  $("dlg-ok").onclick = async () => {
+    const cle = $("dlg-cle").value.trim();
+    if (!cle) return;
+    $("dlg-message").textContent = "Vérification…";
+    try {
+      const r = await appelGitHub(ROBOT, {}, cle);
+      if (!r.ok) {
+        $("dlg-message").textContent = r.status === 401 ? "Clé refusée par GitHub : vérifiez le copier-coller."
+          : "Cette clé n'a pas accès au robot de ce dépôt : vérifiez les étapes 3 et 4.";
+        return;
+      }
+    } catch (e) {
+      $("dlg-message").textContent = "Impossible de joindre GitHub."; return;
+    }
+    ecrireCle(cle);
+    dlg.close();
+    verifierCollecte();
+  };
+  $("dlg-oublier").onclick = () => { ecrireCle(""); dlg.close(); verifierCollecte(); };
+  $("b-relancer").onclick = () => {
+    const u = etat.usage[etat.usage.length - 1];
+    const reste = u && u.requetes_restantes ? ` Il vous en reste ${u.requetes_restantes} ce mois-ci.` : "";
+    if (confirm("Relancer une collecte complète maintenant ? Elle utilise environ 4 requêtes SerpApi (12 le jour des fiches)." + reste)) lancer("normal");
+  };
+}
+
 demarrer();
 </script>
 </body>
