@@ -1,0 +1,74 @@
+# =====================================================================
+#  Configuration de la veille hôtels — Bagnères-de-Luchon
+#  C'est le SEUL fichier à modifier pour changer les réglages.
+#  Une ligne qui commence par # est un commentaire (ignoré).
+# =====================================================================
+
+# Ville recherchée sur Google Hotels
+ville: "Bagnères-de-Luchon"
+
+# ---------------------------------------------------------------------
+# HÔTELS SUIVIS : une ligne par hôtel.
+#   - Pour AJOUTER un hôtel : copiez une ligne et changez le nom.
+#   - Pour RETIRER un hôtel : supprimez la ligne (ou mettez # devant).
+# Le nom doit ressembler à celui affiché sur Google Hotels.
+# Si l'hôtel n'est pas reconnu, ajoutez « autres_noms » avec le nom
+# exact vu sur Google, par exemple :
+#   - nom: "Hôtel Céleste"
+#     autres_noms: ["Celeste Hotel Luchon"]
+# ---------------------------------------------------------------------
+hotels:
+  - nom: "Hôtel des 2 Nations"
+    autres_noms: ["Hôtel des Deux Nations"]
+  - nom: "Hôtel Céleste"
+  - nom: "Hôtel & Spa Gasquet"
+    autres_noms: ["Hôtel Gasquet", "Hotel Spa Gasquet"]
+  - nom: "Alti Hôtel"
+  - nom: "Hôtel d'Etigny"
+  - nom: "Royal Luchon"
+  - nom: "Résidence Illixon"
+  - nom: "Le Castel d'Alti"
+
+# ---------------------------------------------------------------------
+# DATES DE SÉJOUR SUIVIES (date d'arrivée, format AAAA-MM-JJ)
+#   - « +30 » veut dire « dans 30 jours à partir d'aujourd'hui ».
+#   - Une date déjà passée est ignorée automatiquement :
+#     pensez à la remplacer par une nouvelle.
+#   - Chaque date ajoutée consomme des requêtes (voir « budget » plus bas).
+# ---------------------------------------------------------------------
+dates_sejour:
+  - nom: "Week-end de Noël"
+    arrivee: "2026-12-26"
+  - nom: "Week-end de février"
+    arrivee: "2027-02-13"
+  - nom: "Week-end de mars"
+    arrivee: "2027-03-13"
+  - nom: "Dans 30 jours"
+    arrivee: "+30"
+
+nuits: 1
+adultes: 2
+
+# ---------------------------------------------------------------------
+# FRÉQUENCE
+#   frequence_jours : 1 = tous les jours, 2 = un jour sur deux, 7 = chaque semaine…
+#   L'heure de lancement se règle dans .github/workflows/collecte.yml
+#   (voir le README).
+#   jour_fiches : jour de la semaine où l'on récupère les fiches détaillées
+#   (étoiles, restauration, notes détaillées, petit-déjeuner inclus…).
+#   0 = lundi, 1 = mardi … 6 = dimanche.
+# ---------------------------------------------------------------------
+frequence_jours: 1
+jour_fiches: 0
+
+# ---------------------------------------------------------------------
+# BUDGET DE REQUÊTES SerpApi
+#   Offre gratuite (vérifiée en octobre 2026) : 250 requêtes par mois.
+#   L'outil s'arrête tout seul s'il risque de dépasser le quota.
+#   marge_securite : nombre de requêtes gardées en réserve (pour vos essais).
+#   pages_max : pages de résultats Google lues par date (1 page ≈ 20 hôtels).
+# ---------------------------------------------------------------------
+budget:
+  requetes_par_mois: 250
+  marge_securite: 15
+  pages_max: 1
