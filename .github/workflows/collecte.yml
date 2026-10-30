@@ -1,0 +1,65 @@
+# Lancement automatique de la collecte, puis enregistrement des CSV dans le dépôt.
+name: Collecte quotidienne
+
+on:
+  schedule:
+    # HEURE DE LANCEMENT (en heure UTC = heure de Paris moins 1 h en hiver, moins 2 h en été).
+    # Format : "minute heure * * *". Ici 5 h 17 UTC = 6 h 17 (hiver) / 7 h 17 (été) à Paris.
+    - cron: "17 5 * * *"
+  # Permet aussi de lancer à la main : onglet « Actions » > « Collecte quotidienne » > « Run workflow »
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Type de lancement"
+        type: choice
+        default: essai
+        options:
+          - essai     # 1 hôtel, 1 date, n'enregistre rien (2 requêtes)
+          - normal    # collecte complète
+          - fiches    # collecte complète + fiches détaillées
+          - quota     # affiche seulement le compteur (gratuit)
+
+permissions:
+  contents: write   # autorise le robot à enregistrer les CSV
+
+concurrency:
+  group: collecte
+  cancel-in-progress: false
+
+jobs:
+  collecte:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installer les outils Python
+        run: pip install -r requirements.txt
+
+      - name: Lancer la collecte
+        env:
+          SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}
+          MODE: ${{ github.event.inputs.mode || 'auto' }}
+        run: |
+          case "$MODE" in
+            essai)  python collecte.py --essai ;;
+            normal) python collecte.py --forcer ;;
+            fiches) python collecte.py --forcer --fiches ;;
+            quota)  python collecte.py --quota ;;
+            *)      python collecte.py ;;
+          esac
+
+      - name: Enregistrer les nouvelles données
+        run: |
+          git config user.name "robot-collecte"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/
+          if git diff --cached --quiet; then
+            echo "Aucune nouvelle donnée."
+          else
+            git commit -m "Collecte du $(date -u +%Y-%m-%d)"
+            git push
+          fi
