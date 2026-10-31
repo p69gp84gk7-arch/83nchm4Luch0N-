@@ -120,7 +120,24 @@ Gardez l'adresse (elle finit par `/exec`) dans vos favoris, sur téléphone auss
 - **Une fois par semaine** (lundi par défaut) : 1 fiche détaillée par hôtel (plus de sites, étoiles, restauration, petit-déjeuner inclus, notes détaillées) → 8 × ~4,3 = **~35/mois**.
 - **Total ≈ 155/mois** sur 250.
 
-Sécurités : avant chaque collecte, le script lit le compteur SerpApi (gratuit). S'il risque de dépasser le quota, il saute les fiches, puis réduit le nombre de dates, puis s'arrête. La « Réserve de requêtes » (15) reste pour vos essais.
+### Que se passe-t-il si on dépasse 250 ?
+
+SerpApi refuse simplement les recherches suivantes jusqu'au mois suivant (message « plus de recherches disponibles »).
+L'offre gratuite ne demande pas de carte bancaire : rien n'est facturé. Mais il n'y aurait plus de relevés jusqu'à la remise à zéro.
+
+### Pourquoi ça n'arrivera pas
+
+Avant **chaque** collecte (automatique, à l'ouverture, bouton, menu ou essai), le script :
+
+1. lit les requêtes restantes sur le compte SerpApi (gratuit) ; si SerpApi ne répond pas, il les estime avec l'onglet **Compteur** ;
+2. garde toujours la **Réserve de requêtes** des Réglages (15) : elle n'est jamais entamée ;
+3. calcule le **besoin d'ici la fin du mois** avec les réglages actuels ; si le rythme ne tient pas, il réduit tout seul :
+   d'abord les **fiches détaillées**, puis le **nombre de dates** (celles du **haut** de la liste des Réglages passent en premier) ;
+4. ne fait jamais plus de 45 requêtes d'un coup (SerpApi en accepte 50 par heure) ;
+5. s'arrête net quand il ne reste que la réserve : « Quota SerpApi atteint… pas de collecte avant le mois prochain ».
+
+Chaque décision est notée dans l'onglet **Journal** (lignes « Budget » et « Économie de requêtes »).
+L'onglet **Pilotage** du tableau de bord affiche le besoin estimé d'ici la fin du mois face aux requêtes restantes.
 
 Pour estimer un changement : **(dates × 30 ÷ fréquence) + (hôtels × 4,3)**.
 

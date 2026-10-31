@@ -254,6 +254,12 @@ function lireDonnees() {
       a_l_ouverture: cfg.a_l_ouverture, quota: cfg.quota,
     },
     journal: lireJournal(15),
+    budget: (() => {
+      const dernier = lireObjets('compteur').pop();
+      const compte = dernier && dernier.requetes_restantes !== '' ? { plan_searches_left: Number(dernier.requetes_restantes) } : {};
+      const p = projectionMois(cfg, datesValides(cfg, []).length);
+      return { restantes: requetesRestantes(cfg, compte).valeur, reserve: cfg.marge, besoin: p.total, joursRestants: p.joursRestants };
+    })(),
     etat: {
       cleOk: !!cle(), faite: derniereCollecte() === aujourdhui(), aOuverture: cfg.a_l_ouverture,
       derniereCollecte: valeurReglage('Dernière collecte'), miseAJour: valeurReglage('Mise à jour du script'),
@@ -365,22 +371,11 @@ function collecterSansVerrou(opts, journal) {
     ? hotels.map(h => h.nom)
     : hotels.filter(h => !fichesConnues[h.nom]).map(h => h.nom);
 
-  // --- Budget : a-t-on assez de requêtes ? ---
-  const besoinRecherche = sejours.length * cfg.pages_max;
-  if (typeof compte.plan_searches_left === 'number') {
-    const disponible = compte.plan_searches_left - cfg.marge;
-    if (fichesPour.length && disponible < besoinRecherche + fichesPour.length) {
-      journal.push('! Quota presque épuisé : pas de fiches détaillées aujourd\'hui.');
-      fichesPour = [];
-    }
-    if (disponible < besoinRecherche) {
-      const garde = Math.max(0, Math.floor(disponible / cfg.pages_max));
-      if (!garde) return { ok: false, faite: false, journal: journal.join('\n'),
-        message: 'Quota SerpApi épuisé (ou réserve atteinte) : collecte annulée.' };
-      journal.push('! Quota presque épuisé : seulement ' + garde + ' date(s) aujourd\'hui.');
-      sejours = sejours.slice(0, garde);
-    }
-  }
+  // --- Budget : ne jamais dépasser le quota SerpApi ---
+  const budget = budgetCollecte(cfg, compte, sejours, fichesPour, !!opts.essai, journal);
+  if (budget.arret) return { ok: false, faite: false, journal: journal.join('\n'), message: budget.arret };
+  sejours = budget.sejours;
+  fichesPour = budget.fichesPour;
 
   // --- 1) Recherche par date : prix par site + notes, pour tous les hôtels d'un coup ---
   let prix = [];
@@ -450,8 +445,17 @@ function collecterSansVerrou(opts, journal) {
   journal.push('Requêtes utilisées par ce lancement : ' + etat.requetes);
   if (texteQuota(compteApres)) journal.push(texteQuota(compteApres));
 
+  // Le compteur note aussi les essais : il sert d'estimation si SerpApi ne répond pas
+  const ligneCompteur = {
+    date_releve: jour, requetes_ce_lancement: etat.requetes,
+    requetes_ce_mois: valeurOuVide(compteApres.this_month_usage),
+    quota_mois: compteApres.searches_per_month || cfg.quota,
+    requetes_restantes: valeurOuVide(compteApres.plan_searches_left),
+  };
+
   // --- 3) Enregistrement (sauf en mode essai) ---
   if (opts.essai) {
+    ajouterLignes('compteur', [ligneCompteur]);
     journal.push('', '=== RÉSULTAT DE L\'ESSAI (rien n\'est enregistré) ===');
     prix.slice().sort((a, b) => a.prix_nuit_eur - b.prix_nuit_eur).forEach(l =>
       journal.push(l.site + ' : ' + l.prix_nuit_eur + ' €' + (l.offre ? ' (' + l.offre + ')' : '')));
@@ -468,15 +472,82 @@ function collecterSansVerrou(opts, journal) {
   ajouterLignes('prix', prix);
   ajouterLignes('avis', Object.keys(avis).map(h => avis[h]));
   ajouterLignes('hotels', fiches);
-  ajouterLignes('compteur', [{
-    date_releve: jour, requetes_ce_lancement: etat.requetes,
-    requetes_ce_mois: valeurOuVide(compteApres.this_month_usage),
-    quota_mois: compteApres.searches_per_month || cfg.quota,
-    requetes_restantes: valeurOuVide(compteApres.plan_searches_left),
-  }]);
+  ajouterLignes('compteur', [ligneCompteur]);
   return { ok: true, faite: true, journal: journal.join('\n'),
     message: 'Collecte enregistrée : ' + prix.length + ' prix, ' + Object.keys(avis).length + ' notes, '
       + fiches.length + ' fiches.' };
+}
+
+
+// =====================================================================
+//  Garde-fou du quota SerpApi (offre gratuite : 250 requêtes par mois, 50 par heure)
+// =====================================================================
+
+const PLAFOND_PAR_COLLECTE = 45; // SerpApi accepte 50 requêtes par heure : on reste en dessous
+
+/**
+ * Décide combien de requêtes cette collecte peut utiliser, pour ne jamais dépasser le quota :
+ * - requêtes restantes lues sur le compte SerpApi (gratuit) ; s'il ne répond pas, estimées
+ *   avec l'onglet Compteur (quota moins les requêtes notées ce mois-ci) ;
+ * - la « Réserve de requêtes » des Réglages n'est jamais entamée ;
+ * - si le rythme actuel ne tient pas jusqu'à la fin du mois, on réduit : d'abord les fiches
+ *   détaillées, puis le nombre de dates (celles du haut de la liste des Réglages passent en premier).
+ * Renvoie { sejours, fichesPour } ou { arret: 'message' }.
+ */
+function budgetCollecte(cfg, compte, sejours, fichesPour, essai, journal) {
+  const restantes = requetesRestantes(cfg, compte);
+  const disponible = restantes.valeur - cfg.marge;
+  const parDate = cfg.pages_max;
+  const projection = projectionMois(cfg, sejours.length);
+  journal.push('Budget : ' + restantes.valeur + ' requêtes restantes (' + restantes.source + '), réserve de '
+    + cfg.marge + ', besoin estimé d\'ici la fin du mois : ' + projection.total + '.');
+  if (disponible < parDate) {
+    return { arret: 'Quota SerpApi atteint (réserve de ' + cfg.marge + ' gardée) : pas de collecte avant le mois prochain.' };
+  }
+  let fiches = fichesPour, dates = sejours;
+  const tropPourAujourdhui = dates.length * parDate + fiches.length > Math.min(disponible, PLAFOND_PAR_COLLECTE);
+  if (fiches.length && (tropPourAujourdhui || (!essai && projection.total > disponible))) {
+    journal.push("! Économie de requêtes : pas de fiches détaillées aujourd'hui.");
+    fiches = [];
+  }
+  let garde = Math.min(dates.length, Math.floor(Math.min(disponible, PLAFOND_PAR_COLLECTE) / parDate));
+  if (!essai && projection.dates > disponible) {
+    // Le rythme quotidien ne tient pas : on répartit ce qui reste sur les collectes à venir
+    garde = Math.min(garde, Math.max(1, Math.floor(disponible / projection.collectes / parDate)));
+  }
+  if (garde < dates.length) {
+    journal.push('! Économie de requêtes : ' + garde + ' date(s) sur ' + dates.length + " aujourd'hui ("
+      + dates.slice(0, garde).map(d => d.nom).join(', ') + ').');
+    dates = dates.slice(0, garde);
+  }
+  return { sejours: dates, fichesPour: fiches };
+}
+
+/** Requêtes restantes ce mois-ci : { valeur, source }. */
+function requetesRestantes(cfg, compte) {
+  if (compte && typeof compte.plan_searches_left === 'number') {
+    return { valeur: compte.plan_searches_left, source: 'compte SerpApi' };
+  }
+  const mois = aujourdhui().slice(0, 7);
+  const utilisees = lireObjets('compteur').filter(l => String(l.date_releve).startsWith(mois))
+    .reduce((total, l) => total + (Number(l.requetes_ce_lancement) || 0), 0);
+  return { valeur: cfg.quota - utilisees, source: 'estimation avec l\'onglet Compteur, SerpApi ne répond pas' };
+}
+
+/** Requêtes nécessaires d'ici la fin du mois (aujourd'hui compris) avec les réglages actuels. */
+function projectionMois(cfg, nbDates) {
+  const [a, m, j] = aujourdhui().split('-').map(Number);
+  const joursDansLeMois = new Date(Date.UTC(a, m, 0)).getUTCDate();
+  const joursRestants = joursDansLeMois - j + 1;
+  const collectes = Math.ceil(joursRestants / Math.max(1, cfg.frequence_jours));
+  let joursFiches = 0;
+  for (let k = 0; k < joursRestants; k++) {
+    const jourSemaine = new Date(Date.UTC(a, m - 1, j + k)).getUTCDay(); // 0 = dimanche
+    if (JOURS[(jourSemaine + 6) % 7] === cfg.jour_fiches) joursFiches++;
+  }
+  const dates = collectes * nbDates * cfg.pages_max;
+  return { dates: dates, fiches: joursFiches * cfg.hotels.length, total: dates + joursFiches * cfg.hotels.length,
+    collectes: collectes, joursRestants: joursRestants };
 }
 
 

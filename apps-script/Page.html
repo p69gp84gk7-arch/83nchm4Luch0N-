@@ -172,6 +172,10 @@
   .journal summary { cursor: pointer; font-size: 0.9rem; }
   .journal summary span { color: var(--texte-3); margin-right: 6px; font-variant-numeric: tabular-nums; }
   .liste { margin: 6px 0 0; padding-left: 18px; font-size: 0.9rem; }
+  .budget { font-size: 0.88rem; border-radius: 8px; padding: 10px 12px; margin: 0; background: var(--carte-2); color: var(--texte-2); }
+  .budget strong { color: var(--texte); }
+  .budget.ok strong { color: var(--baisse); }
+  .budget.attention strong { color: var(--attention); }
   .vide { color: var(--texte-2); padding: 24px 0; text-align: center; }
   #toast {
     position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); background: var(--texte); color: var(--fond);
@@ -277,6 +281,7 @@
           <div class="detail" id="p-quota-detail"></div>
         </div>
         <p class="aide" id="p-estimation" style="margin-top:10px"></p>
+        <p class="budget" id="p-budget"></p>
       </div>
       <div class="bloc">
         <h2>Réglages</h2>
@@ -663,6 +668,14 @@ function dessinerPilotage(d) {
   const r = etat.reglages;
   const estimation = Math.round((r.dates.length * 30) / Math.max(1, r.frequence_jours || 1) + r.hotels.length * 4.3);
   $("p-estimation").textContent = `Avec les réglages actuels : environ ${estimation} requêtes par mois (${r.dates.length} dates × 30 jours, plus ${r.hotels.length} fiches détaillées par semaine).`;
+  const b = d.budget;
+  if (b) {
+    const tient = b.besoin <= b.restantes - b.reserve;
+    $("p-budget").className = "budget " + (tient ? "ok" : "attention");
+    $("p-budget").innerHTML = `<strong>${tient ? "✓ Le quota tiendra jusqu'à la fin du mois" : "⚠ Rythme trop élevé pour finir le mois"}</strong><br>
+      Besoin estimé d'ici la fin du mois (${b.joursRestants} jour${b.joursRestants > 1 ? "s" : ""}) : ${b.besoin} requêtes · restantes : ${b.restantes} (dont ${b.reserve} de réserve).
+      ${tient ? "" : "<br>Le script réduit tout seul : d'abord les fiches détaillées, puis le nombre de dates. Le quota ne sera pas dépassé."}`;
+  }
   $("p-automatisme").textContent = `Collecte chaque jour vers ${r.heure} h${r.a_l_ouverture ? " et à l'ouverture du classeur" : ""} · fiches détaillées le ${r.jour_fiches}.`;
   $("p-hotels").innerHTML = r.hotels.map((h) => `<li>${echapper(h)}</li>`).join("") || "<li>aucun</li>";
   $("p-dates").innerHTML = r.dates.map((x) => `<li>${echapper(x.nom)} : ${dateLongue(x.arrivee)}</li>`).join("") || "<li>aucune date à venir</li>";
