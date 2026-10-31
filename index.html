@@ -83,6 +83,7 @@
     border: 1px solid var(--trait); background: var(--carte); color: var(--texte);
   }
   .puce-sejour small { display: block; color: var(--texte-3); font-size: 0.8rem; }
+  .puce-sejour.ajout { border-style: dashed; color: var(--accent); }
   .puce-sejour[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-fond); box-shadow: inset 0 0 0 1px var(--accent); }
   .onglets { display: flex; gap: 4px; border-bottom: 1px solid var(--trait); margin: 10px 0 16px; overflow-x: auto; }
   .onglet {
@@ -109,36 +110,52 @@
   .bascule button[aria-pressed="true"] { background: var(--accent); color: #fff; }
 
   /* ---------- Cartes hôtels ---------- */
-  .cartes { display: grid; grid-template-columns: repeat(auto-fill, minmax(255px, 1fr)); gap: 14px; }
-  .carte-hotel { background: var(--carte); border: 1px solid var(--trait); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; }
-  .carte-hotel.sans-prix { opacity: 0.75; }
-  .photo { position: relative; height: 120px; background: var(--carte-2) center / cover no-repeat; }
-  .photo.sans-photo { height: 56px; background: color-mix(in srgb, var(--teinte) 18%, var(--carte)); }
+  .cartes { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+  .carte-hotel { background: var(--carte); border: 1px solid var(--trait); border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 1px 2px rgb(0 0 0 / 0.04); }
+  .carte-hotel.sans-prix { opacity: 0.8; }
+  .photo { position: relative; height: 150px; background: var(--carte-2) center / cover no-repeat; }
+  .photo.sans-photo { height: 96px; background: color-mix(in srgb, var(--teinte) 22%, var(--carte)); }
+  .photo .voile { position: absolute; inset: auto 0 0 0; padding: 26px 14px 10px; color: #fff;
+    background: linear-gradient(to top, rgb(0 0 0 / 0.72), rgb(0 0 0 / 0)); }
+  .photo.sans-photo .voile { background: none; color: var(--texte); padding-left: 64px; }
+  .photo .voile h3 { font-size: 1.12rem; line-height: 1.2; margin: 0; text-shadow: 0 1px 2px rgb(0 0 0 / 0.35); }
+  .photo.sans-photo .voile h3 { text-shadow: none; }
+  .photo .voile .etoiles { font-size: 0.85rem; color: #ffd166; letter-spacing: 1px; }
+  .photo.sans-photo .voile .etoiles { color: var(--attention); }
   .photo .initiales {
-    position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 36px; height: 36px; border-radius: 50%;
-    display: grid; place-items: center; font-size: 0.9rem; font-weight: 700; color: #fff; background: var(--teinte);
+    position: absolute; left: 14px; bottom: 12px; width: 40px; height: 40px; border-radius: 50%;
+    display: grid; place-items: center; font-size: 0.95rem; font-weight: 700; color: #fff; background: var(--teinte);
   }
   .photo .comparer {
-    position: absolute; top: 8px; right: 8px; display: flex; align-items: center; gap: 5px; font-size: 0.78rem;
-    background: rgb(0 0 0 / 0.55); color: #fff; padding: 3px 8px; border-radius: 999px; cursor: pointer;
+    position: absolute; top: 10px; right: 10px; display: flex; align-items: center; gap: 5px; font-size: 0.78rem;
+    background: rgb(0 0 0 / 0.55); color: #fff; padding: 4px 9px; border-radius: 999px; cursor: pointer;
   }
   .photo .comparer input { margin: 0; accent-color: var(--accent); }
-  .corps { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
-  .nom { display: flex; align-items: center; gap: 7px; }
+  .photo .liseré { position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--teinte); }
+  .corps { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
   .puce { flex: none; width: 10px; height: 10px; border-radius: 50%; }
-  .meta { font-size: 0.85rem; color: var(--texte-2); }
   .etoiles { color: var(--attention); letter-spacing: 1px; }
-  .note { font-weight: 650; color: var(--texte); }
-  .ligne-prix { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
-  .montant { font-size: 1.6rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .bloc-prix { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
+  .ligne-prix { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+  .montant { font-size: 2rem; font-weight: 750; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
   .par-nuit { color: var(--texte-3); font-size: 0.85rem; }
-  .tendance { font-size: 0.85rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .tendance { font-size: 0.82rem; font-weight: 650; font-variant-numeric: tabular-nums; padding: 2px 7px; border-radius: 999px; background: var(--carte-2); white-space: nowrap; }
   .hausse { color: var(--hausse); } .baisse { color: var(--baisse); }
   .site { font-size: 0.85rem; color: var(--texte-2); }
-  .spark { width: 100%; height: 38px; display: block; }
-  .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; padding-top: 4px; }
-  .tag { font-size: 0.76rem; padding: 2px 8px; border-radius: 999px; background: var(--carte-2); color: var(--texte-2); }
+  .direct { font-size: 0.82rem; color: var(--texte-2); background: var(--carte-2); border-radius: 8px; padding: 5px 8px; }
+  .spark { width: 100%; height: 34px; display: block; }
+  .mesures-carte { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .mesure { background: var(--carte-2); border-radius: 10px; padding: 7px 6px; text-align: center; min-width: 0; }
+  .mesure b { display: block; font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+  .mesure span { display: block; font-size: 0.7rem; color: var(--texte-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mesure.bonne b { color: var(--baisse); } .mesure.faible b { color: var(--hausse); }
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag { font-size: 0.76rem; padding: 3px 9px; border-radius: 999px; background: var(--carte-2); color: var(--texte-2); }
   .tag.oui { background: var(--accent-fond); color: var(--texte); }
+  .actions-carte { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; }
+  .actions-carte a { flex: 1 1 auto; text-align: center; text-decoration: none; font-size: 0.84rem; padding: 7px 10px; border-radius: 9px;
+    border: 1px solid var(--trait); color: var(--texte); background: var(--carte); white-space: nowrap; }
+  .actions-carte a.principal { background: var(--accent); border-color: var(--accent); color: #fff; }
 
   /* ---------- Graphique et tableau ---------- */
   .zone-graphique { position: relative; height: 340px; }
@@ -210,6 +227,10 @@
   .rond { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--trait); }
   .leaflet-popup-content .bouton { margin-top: 8px; min-height: 30px; padding: 4px 10px; font-size: 0.85rem; }
   .source { font-size: 0.72rem; padding: 1px 6px; border-radius: 999px; background: var(--carte-2); color: var(--texte-3); margin-left: 4px; }
+  input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 6px; }
+  .centre-zone { width: 22px; height: 22px; border-radius: 50%; background: var(--carte); border: 3px solid var(--accent);
+    box-shadow: 0 1px 4px rgb(0 0 0 / 0.35); display: grid; place-items: center; cursor: grab; }
+  .centre-zone::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
   .zone-echantillon { display: inline-block; width: 16px; height: 12px; border-radius: 3px; border: 2px solid var(--accent); background: var(--accent-fond); }
 
   #toast {
@@ -233,6 +254,19 @@
   </header>
 
   <nav class="sejours" id="sejours" aria-label="Séjour suivi"></nav>
+
+  <div class="bloc" id="panneau-date" hidden style="margin-top:12px">
+    <h2>Comparer une nouvelle date de séjour</h2>
+    <p class="aide">Les prix de tous les hôtels suivis seront relevés pour cette date d'arrivée (même nombre de nuits et d'adultes que les autres séjours),
+      puis à chaque collecte. Sur cette page, le code d'accès est demandé.</p>
+    <div class="outils">
+      <label>Arrivée <input type="date" id="date-arrivee" required></label>
+      <label style="flex:1;min-width:180px">Nom (facultatif) <input type="text" id="date-nom" maxlength="40" placeholder="ex. Vacances de Pâques"></label>
+      <label style="flex-direction:row;align-items:center;gap:6px;color:var(--texte)"><input type="checkbox" id="date-maintenant" checked> Relever les prix tout de suite (1 requête)</label>
+    </div>
+    <div class="boutons"><button type="button" class="bouton principal" id="b-date-ajouter">Ajouter et comparer</button>
+      <button type="button" class="bouton" id="b-date-annuler">Annuler</button></div>
+  </div>
 
   <nav class="onglets" role="tablist">
     <button class="onglet" role="tab" data-vue="apercu" aria-selected="true">Aperçu</button>
@@ -273,6 +307,20 @@
         <strong>Offres</strong> : séjours suivis pour lesquels l'hôtel a un prix au dernier relevé.
         <strong>Parité</strong> : écart entre le site officiel et l'agence en ligne la moins chère (+ = officiel plus cher).
         <strong>Réponse aux avis</strong> : part des avis récents relevés auxquels l'hôtel a répondu. « — » = pas encore d'information.</p>
+    </div>
+    <div class="grille-2">
+      <div class="bloc">
+        <h2>Satisfaction des clients</h2>
+        <p class="aide">Part des mentions positives dans les avis Google, tous thèmes confondus. Posez le doigt sur une colonne (ou glissez) pour le détail.</p>
+        <div class="zone-graphique"><canvas id="g-satisfaction" aria-label="Satisfaction des clients par hôtel"></canvas></div>
+        <p class="vide" id="g-satisfaction-vide" hidden></p>
+      </div>
+      <div class="bloc">
+        <h2>Répartition des avis par étoiles</h2>
+        <p class="aide">Part des avis Google à 5, 4, 3, 2 et 1 étoile(s). Posez le doigt sur une colonne pour le détail.</p>
+        <div class="zone-graphique"><canvas id="g-etoiles" aria-label="Répartition des avis par étoiles"></canvas></div>
+        <p class="vide" id="g-etoiles-vide" hidden></p>
+      </div>
     </div>
     <div class="grille-2">
       <div class="bloc">
@@ -332,6 +380,12 @@
   <section id="v-carte" hidden>
     <div class="grille-carte">
       <div>
+        <div class="outils" style="margin-bottom:10px">
+          <label style="flex:1;min-width:220px">Zone de chalandise : rayon de <strong id="rayon-valeur">2 km</strong>
+            <input type="range" id="rayon" min="0.5" max="20" step="0.5" value="2" aria-label="Rayon de la zone en kilomètres"></label>
+          <button type="button" class="bouton principal" id="b-zone-enregistrer" disabled>Enregistrer cette zone</button>
+        </div>
+        <p class="aide" style="margin-top:-4px">Glissez le curseur pour élargir ou réduire la zone, et le point central (◉) pour la déplacer. « Enregistrer » la garde pour tous les appareils.</p>
         <div id="carte" role="region" aria-label="Carte des hôtels et de la zone de collecte"></div>
         <div class="legende-carte">
           <span><span class="zone-echantillon"></span>Zone de collecte</span>
@@ -552,13 +606,45 @@ function dessinerSejours() {
     const n = Object.keys(seriesSejour(s.nom)).length;
     return `<button type="button" class="puce-sejour" data-sejour="${echapper(s.nom)}" aria-pressed="${s.nom === etat.sejour}">
       ${echapper(s.nom)}<small>${s.nom.startsWith("Dans") ? "date glissante" : "arrivée " + dateCourte(s.arrivee)} · ${n} hôtel${n > 1 ? "s" : ""}</small></button>`;
-  }).join("");
+  }).join("") + `<button type="button" class="puce-sejour ajout" data-ajout-date>+ Comparer une date<small>ajouter un séjour</small></button>`;
 }
 $("sejours").addEventListener("click", (e) => {
+  if (e.target.closest("[data-ajout-date]")) {
+    const demain = new Date(Date.now() + 864e5).toISOString().slice(0, 10);
+    $("date-arrivee").min = demain;
+    if (!$("date-arrivee").value) $("date-arrivee").value = demain;
+    $("panneau-date").hidden = false;
+    $("date-arrivee").focus();
+    return;
+  }
   const b = e.target.closest("[data-sejour]");
   if (!b) return;
   etat.sejour = b.dataset.sejour;
   toutDessiner();
+});
+
+$("b-date-annuler").addEventListener("click", () => ($("panneau-date").hidden = true));
+$("b-date-ajouter").addEventListener("click", async () => {
+  const arrivee = $("date-arrivee").value;
+  if (!arrivee || arrivee <= new Date().toISOString().slice(0, 10)) { toast("Choisissez une date d'arrivée après aujourd'hui."); return; }
+  const nom = $("date-nom").value.trim() || "Séjour du " + dateCourte(arrivee);
+  const maintenant = $("date-maintenant").checked;
+  $("b-date-ajouter").disabled = true;
+  pastille(`<span class="tourne"></span>${maintenant ? "Relevé des prix pour « " + echapper(nom) + " »…" : "Ajout de « " + echapper(nom) + " »…"}`);
+  try {
+    const r = await serveur("collecterDepuisPage", { action: "ajouterDate", nom, arrivee, collecter: maintenant });
+    pastille((r.ok ? "✓ " : "✗ ") + echapper(r.message), r.ok ? "ok" : "erreur");
+    toast(r.message);
+    if (r.faite) {
+      $("panneau-date").hidden = true; $("date-nom").value = ""; $("date-arrivee").value = "";
+      etat.sejour = nom;
+      await charger();
+    }
+  } catch (e) {
+    pastille("✗ " + echapper(e.message || e), "erreur");
+  } finally {
+    $("b-date-ajouter").disabled = false;
+  }
 });
 
 // ------------------------- Aperçu -------------------------
@@ -608,36 +694,57 @@ function dessinerApercu() {
   };
   const ordre = hotels.slice().sort((a, b) => cle(a) - cle(b) || a.localeCompare(b, "fr"));
   $("info-cartes").textContent = `Prix pour 1 nuit, 2 adultes, au dernier relevé${derniers.length ? " (" + dateCourte(derniers.map((d) => d.jour).sort().pop()) + ")" : ""}.`;
+  const mesures = {};
+  mesuresBenchmark().forEach((m) => { mesures[m.hotel] = m; });
   $("cartes").innerHTML = ordre.map((h) => {
-    const s = series[h], info = etat.infos[h] || {}, n = noteSur10(h), teinte = couleur(h);
+    const s = series[h], info = etat.infos[h] || {}, teinte = couleur(h), m = mesures[h] || {};
     const etoiles = info.categorie_etoiles ? "★".repeat(Number(info.categorie_etoiles)) : "";
-    const initiales = h.replace(/^(hôtel|hotel|le|la|résidence)\s+(&\s*spa\s+|des\s+|d['’]\s*)?/i, "").split(/\s+/).map((m) => m[0]).join("").slice(0, 2).toUpperCase();
+    const initiales = h.replace(/^(hôtel|hotel|le|la|résidence)\s+(&\s*spa\s+|des\s+|d['’]\s*)?/i, "").split(/\s+/).map((x) => x[0]).join("").slice(0, 2).toUpperCase();
+    const titre = `<div class="voile"><h3>${echapper(h)}</h3>${etoiles ? `<span class="etoiles" aria-label="${info.categorie_etoiles} étoiles">${etoiles}</span>` : ""}</div>`;
     const photo = info.photo
-      ? `<div class="photo" style="background-image:url('${echapper(info.photo)}')">`
-      : `<div class="photo sans-photo" style="--teinte:${teinte}"><span class="initiales">${echapper(initiales)}</span>`;
+      ? `<div class="photo" style="background-image:url('${echapper(info.photo)}');--teinte:${teinte}"><span class="liseré"></span>${titre}`
+      : `<div class="photo sans-photo" style="--teinte:${teinte}"><span class="initiales">${echapper(initiales)}</span>${titre}`;
+    // Quatre mesures bien visibles : note multi-sites, avis, satisfaction, emplacement
+    const tuile = (valeur, libelle, bonne, faible) =>
+      `<div class="mesure ${valeur !== "—" && bonne ? "bonne" : valeur !== "—" && faible ? "faible" : ""}"><b>${valeur}</b><span>${libelle}</span></div>`;
+    const mesuresCarte = `<div class="mesures-carte">
+      ${tuile(sur10(m.multi), "note /10", m.multi >= 8.5, m.multi != null && m.multi < 7.5)}
+      ${tuile(m.totalAvis ? (m.totalAvis >= 1000 ? (m.totalAvis / 1000).toFixed(1).replace(".", ",") + " k" : m.totalAvis) : "—", "avis")}
+      ${tuile(pct(m.positif), "satisfaits", m.positif >= 80, m.positif != null && m.positif < 65)}
+      ${tuile(sur10(m.emplacement), "emplacement", m.emplacement >= 9, m.emplacement != null && m.emplacement < 7.5)}
+    </div>`;
     const resto = info.restaurant_sur_place, pdj = info.petit_dejeuner_propose;
     const tags = [
       resto ? `<span class="tag ${resto === "oui" ? "oui" : ""}">Restaurant : ${echapper(resto)}</span>` : "",
       pdj ? `<span class="tag ${String(pdj).startsWith("oui") ? "oui" : ""}">Petit-déj. : ${echapper(pdj)}</span>` : "",
+      m.annulation > 0 ? `<span class="tag oui">Annulation gratuite possible</span>` : "",
+      m.nbSejours ? `<span class="tag">Offres : ${m.offres} / ${m.nbSejours} séjours</span>` : "",
     ].join("");
+    const direct = m.prixOfficiel != null
+      ? `<div class="direct">Sur le site de l'hôtel : <b>${euros(m.prixOfficiel)}</b>${m.parite != null && Math.abs(m.parite) >= 1 ? ` (${m.parite > 0 ? "+" : ""}${euros(m.parite)} vs agences)` : " (même prix que les agences)"}</div>`
+      : "";
     const prix = s
-      ? `<div class="ligne-prix"><span class="montant">${euros(s.dernier.prix)}</span><span class="par-nuit">/ nuit</span>
-          ${s.evolution != null ? `<span class="tendance ${s.evolution > 0.5 ? "hausse" : s.evolution < -0.5 ? "baisse" : ""}">${pourcent(s.evolution)}</span>` : ""}</div>
-         <div class="site">sur ${echapper(s.dernier.site)}${s.dernier.lien ? ` · <a href="${echapper(s.dernier.lien)}" target="_blank" rel="noopener">voir l'offre</a>` : ""}
-           ${s.plusBas.prix < s.dernier.prix ? `<br><span class="discret">plus bas vu : ${euros(s.plusBas.prix)} le ${dateCourte(s.plusBas.jour)}</span>` : ""}</div>
-         ${sparkline(s.points, teinte)}`
+      ? `<div class="bloc-prix"><div><div class="ligne-prix"><span class="montant">${euros(s.dernier.prix)}</span><span class="par-nuit">/ nuit</span></div>
+           <div class="site">sur ${echapper(s.dernier.site)}${s.plusBas.prix < s.dernier.prix ? ` · plus bas vu ${euros(s.plusBas.prix)} le ${dateCourte(s.plusBas.jour)}` : ""}</div></div>
+           ${s.evolution != null ? `<span class="tendance ${s.evolution > 0.5 ? "hausse" : s.evolution < -0.5 ? "baisse" : ""}">${pourcent(s.evolution)}</span>` : ""}</div>
+         ${direct}${sparkline(s.points, teinte)}`
       : info.property_token
         ? `<div class="ligne-prix"><span class="discret">Pas de prix pour ce séjour</span></div>
            <div class="site discret">trouvé sur Google Hotels, mais aucune offre à ces dates : fermé, complet ou pas vendu en ligne</div>`
         : `<div class="ligne-prix"><span class="discret">Pas encore trouvé sur Google Hotels</span></div>
            <div class="site discret">recherche ciblée sur son nom (2 hôtels par collecte) ; voir le Journal dans Pilotage</div>`;
+    const actions = [
+      s && s.dernier.lien ? `<a class="principal" href="${echapper(s.dernier.lien)}" target="_blank" rel="noopener">Voir l'offre</a>` : "",
+      info.site_officiel ? `<a href="${echapper(info.site_officiel)}" target="_blank" rel="noopener">Site de l'hôtel</a>` : "",
+      info.telephone ? `<a href="tel:${echapper(String(info.telephone).replace(/[^+\d]/g, ""))}">Appeler</a>` : "",
+    ].join("");
     return `<article class="carte-hotel ${s ? "" : "sans-prix"}">
       ${photo}<label class="comparer"><input type="checkbox" data-comparer="${echapper(h)}" ${etat.choisis.has(h) ? "checked" : ""}> Comparer</label></div>
       <div class="corps">
-        <div class="nom"><span class="puce" style="background:${teinte}"></span><h3>${echapper(h)}</h3></div>
-        <div class="meta">${etoiles ? `<span class="etoiles" aria-label="${info.categorie_etoiles} étoiles">${etoiles}</span> · ` : ""}${n && !isNaN(n.note) ? `<span class="note">${n.note.toFixed(1).replace(".", ",")}</span>/10${isNaN(n.avis) ? "" : " · " + n.avis.toLocaleString("fr-FR") + " avis"}` : "pas encore de note"}</div>
         ${prix}
-        <div class="tags">${tags}</div>
+        ${mesuresCarte}
+        ${tags ? `<div class="tags">${tags}</div>` : ""}
+        ${actions ? `<div class="actions-carte">${actions}</div>` : ""}
       </div></article>`;
   }).join("");
 }
@@ -648,6 +755,28 @@ $("cartes").addEventListener("change", (e) => {
   e.target.checked ? etat.choisis.add(h) : etat.choisis.delete(h);
   toast(etat.choisis.size >= 2 ? `${etat.choisis.size} hôtels à comparer : onglet « Comparer »` : "Cochez au moins 2 hôtels pour les comparer");
 });
+
+// ------------------------- Graphiques : info-bulle seulement sous le doigt -------------------------
+// La bulle apparaît quand le doigt (ou la souris) touche le graphique, suit le doigt qui glisse,
+// et disparaît dès qu'il se lève (ou que la souris sort).
+const EVENEMENTS_GRAPHIQUE = ["mousemove", "mouseout", "touchstart", "touchmove", "touchend", "touchcancel"];
+const bulleSousLeDoigt = {
+  id: "bulleSousLeDoigt",
+  afterEvent(c, args) {
+    // Chart.js renomme « touchend » en « mouseup » : on regarde l'événement d'origine
+    const t = args.event.native ? args.event.native.type : args.event.type;
+    if (t === "touchend" || t === "touchcancel" || t === "mouseout") {
+      c.setActiveElements([]);
+      c.tooltip.setActiveElements([], { x: 0, y: 0 });
+      c.update("none");
+    }
+  },
+};
+function styleBulle() {
+  const css = getComputedStyle(document.documentElement);
+  return { backgroundColor: css.getPropertyValue("--texte").trim(), titleColor: css.getPropertyValue("--fond").trim(),
+    bodyColor: css.getPropertyValue("--fond").trim(), padding: 10, cornerRadius: 8, displayColors: true, boxPadding: 4 };
+}
 
 // ------------------------- Benchmark -------------------------
 const sur10 = (v) => (v == null || isNaN(v) ? "—" : v.toFixed(1).replace(".", ","));
@@ -697,6 +826,7 @@ function mesuresBenchmark() {
       positif: mentions ? (100 * positifs) / mentions : null,
       reponse: avisRecents.length ? (100 * repondus) / avisRecents.length : null, nbAvisRecents: avisRecents.length,
       parite: officiel.length && agences.length ? Math.min(...officiel) - Math.min(...agences) : null,
+      prixOfficiel: officiel.length ? Math.min(...officiel) : null, siteOfficiel: info.site_officiel || "",
       pdj: lignes.length ? (lignes.some((l) => contient(l.offre, "petit-déjeuner inclus")) ? "oui" : "non") : null,
       annulation: lignes.length ? (100 * lignes.filter((l) => contient(l.offre, "annulation gratuite")).length) / lignes.length : null,
       prixHabituel: info.prix_habituel_min !== "" && info.prix_habituel_min != null ? euros(nombre(info.prix_habituel_min)) + " – " + euros(nombre(info.prix_habituel_max)) : "",
@@ -719,6 +849,7 @@ function colonnesBenchmark() {
     { cle: "emplacement", titre: "Emplacement /10", num: true, texte: (m) => sur10(m.emplacement) },
     { cle: "positif", titre: "Mentions positives", num: true, texte: (m) => pct(m.positif) },
     { cle: "reponse", titre: "Réponse aux avis", num: true, texte: (m) => (m.reponse == null ? "—" : pct(m.reponse) + ` <span class="discret">(${m.nbAvisRecents})</span>`) },
+    { cle: "prixOfficiel", titre: "Prix site de l'hôtel", num: true, texte: (m) => (m.prixOfficiel == null ? (m.siteOfficiel ? `<a href="${echapper(m.siteOfficiel)}" target="_blank" rel="noopener">site</a>` : "—") : euros(m.prixOfficiel)) },
     { cle: "parite", titre: "Parité officiel / agences", num: true, texte: (m) => (m.parite == null ? "—" : (m.parite > 0 ? "+" : "") + euros(m.parite)) },
     { cle: "pdj", titre: "Petit-déj. inclus", texte: (m) => m.pdj || "—" },
     { cle: "annulation", titre: "Annulation gratuite", num: true, texte: (m) => pct(m.annulation) },
@@ -739,7 +870,7 @@ function dessinerBenchmark() {
     return (typeof x === "number" ? x - y : String(x).localeCompare(String(y), "fr")) * (asc ? 1 : -1);
   });
   // Meilleur et moins bon de chaque colonne chiffrée (sens : plus haut = mieux, sauf prix, indice et parité)
-  const bas = ["prix", "indice", "parite"];
+  const bas = ["prix", "indice", "parite", "prixOfficiel"];
   const extremes = {};
   cols.filter((c) => c.num && !["etoiles", "offres"].includes(c.cle)).forEach((c) => {
     const vs = mesures.map((m) => valeur(m, c)).filter((v) => typeof v === "number" && !isNaN(v));
@@ -755,6 +886,8 @@ function dessinerBenchmark() {
       return `<td class="${classe}">${contenu}</td>`;
     }).join("") + "</tr>").join("") + "</tbody>";
   etat.derniersBm = { mesures, cols };
+  dessinerSatisfaction(mesures);
+  dessinerEtoiles();
   dessinerPositionnement(mesures);
   dessinerForcesFaiblesses();
   dessinerAvisRecents();
@@ -779,6 +912,82 @@ $("b-export").addEventListener("click", () => {
   lien.download = `benchmark-luchon-${etat.sejour.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\W+/g, "-").toLowerCase()}-${new Date().toISOString().slice(0, 10)}.csv`;
   document.body.appendChild(lien); lien.click(); lien.remove();
 });
+
+// Répartition des avis par étoiles : dernière fiche détaillée de chaque hôtel (« 5★ : 180 | 4★ : 90 … »)
+function etoilesAvis(h) {
+  const lignes = etat.avis.filter((a) => a.hotel === h && /★/.test(a.notes_detaillees || ""));
+  if (!lignes.length) return null;
+  const r = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+  String(lignes[lignes.length - 1].notes_detaillees).replace(/(\d)★\s*:\s*(\d+)/g, (_, e, n) => { r[e] = Number(n); });
+  const total = Object.values(r).reduce((a, b) => a + b, 0);
+  return total ? { r, total } : null;
+}
+
+const graphiquesBm = {};
+function graphiqueColonnes(id, config) {
+  if (graphiquesBm[id]) graphiquesBm[id].destroy();
+  graphiquesBm[id] = new Chart($(id), config);
+}
+
+function dessinerSatisfaction(mesures) {
+  const css = getComputedStyle(document.documentElement);
+  const texte2 = css.getPropertyValue("--texte-2").trim(), grille = css.getPropertyValue("--grille").trim();
+  const avec = mesures.filter((m) => m.positif != null).sort((a, b) => b.positif - a.positif);
+  $("g-satisfaction-vide").hidden = avec.length > 0;
+  if (!avec.length) { if (graphiquesBm["g-satisfaction"]) graphiquesBm["g-satisfaction"].destroy(); $("g-satisfaction-vide").textContent = "Les thèmes des avis arrivent avec les fiches détaillées."; return; }
+  const themesDe = (h) => etat.themes.filter((t) => t.hotel === h && Number(t.mentions) >= 5).sort((a, b) => Number(b.pct_positif) - Number(a.pct_positif));
+  graphiqueColonnes("g-satisfaction", {
+    type: "bar",
+    data: { labels: avec.map((m) => m.hotel), datasets: [{ label: "Mentions positives", data: avec.map((m) => Math.round(m.positif)),
+      backgroundColor: avec.map((m) => couleur(m.hotel)), borderRadius: { topLeft: 4, topRight: 4 }, borderSkipped: "bottom", maxBarThickness: 46 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false, events: EVENEMENTS_GRAPHIQUE, interaction: { mode: "index", intersect: false },
+      plugins: { legend: { display: false }, tooltip: { ...styleBulle(), callbacks: {
+        label: (c) => ` ${c.parsed.y} % de mentions positives`,
+        afterLabel: (c) => { const t = themesDe(c.label); return t.length ? [` Point fort : ${t[0].theme} (${t[0].pct_positif} %)`, ` Point faible : ${t[t.length - 1].theme} (${t[t.length - 1].pct_positif} %)`] : ""; },
+      } } },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: texte2, autoSkip: false, maxRotation: 45, minRotation: 0, font: { size: 11 } } },
+        y: { min: 0, max: 100, grid: { color: grille }, border: { display: false }, ticks: { color: texte2, stepSize: 25, callback: (v) => v + " %" } },
+      },
+    },
+    plugins: [bulleSousLeDoigt],
+  });
+}
+
+function dessinerEtoiles() {
+  const css = getComputedStyle(document.documentElement);
+  const texte2 = css.getPropertyValue("--texte-2").trim(), grille = css.getPropertyValue("--grille").trim();
+  const avec = etat.ordreHotels.map((h) => ({ h, e: etoilesAvis(h) })).filter((x) => x.e)
+    .sort((a, b) => b.e.r[5] / b.e.total - a.e.r[5] / a.e.total);
+  $("g-etoiles-vide").hidden = avec.length > 0;
+  if (!avec.length) { if (graphiquesBm["g-etoiles"]) graphiquesBm["g-etoiles"].destroy(); $("g-etoiles-vide").textContent = "La répartition arrive avec les fiches détaillées."; return; }
+  // Une seule teinte, du plus foncé (5 étoiles) au plus clair (1 étoile)
+  const teintes = { 5: "#184f95", 4: "#256abf", 3: "#3987e5", 2: "#6da7ec", 1: "#86b6ef" };
+  graphiqueColonnes("g-etoiles", {
+    type: "bar",
+    data: { labels: avec.map((x) => x.h), datasets: [5, 4, 3, 2, 1].map((n) => ({
+      label: n + "★", data: avec.map((x) => Math.round((1000 * x.e.r[n]) / x.e.total) / 10), backgroundColor: teintes[n],
+      borderColor: css.getPropertyValue("--carte").trim(), borderWidth: { top: 2 }, borderSkipped: false, maxBarThickness: 46,
+      borderRadius: n === 5 ? { topLeft: 4, topRight: 4 } : 0, effectifs: avec.map((x) => x.e.r[n]),
+    })) },
+    options: {
+      responsive: true, maintainAspectRatio: false, events: EVENEMENTS_GRAPHIQUE, interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { position: "bottom", labels: { color: texte2, boxWidth: 12, boxHeight: 12, padding: 12 } },
+        tooltip: { ...styleBulle(), callbacks: {
+          title: (items) => items[0].label + " · " + avec[items[0].dataIndex].e.total.toLocaleString("fr-FR") + " avis",
+          label: (c) => ` ${c.dataset.label} : ${String(c.parsed.y).replace(".", ",")} % (${c.dataset.effectifs[c.dataIndex]} avis)`,
+        } },
+      },
+      scales: {
+        x: { stacked: true, grid: { display: false }, ticks: { color: texte2, autoSkip: false, maxRotation: 45, minRotation: 0, font: { size: 11 } } },
+        y: { stacked: true, min: 0, max: 100, grid: { color: grille }, border: { display: false }, ticks: { color: texte2, stepSize: 25, callback: (v) => v + " %" } },
+      },
+    },
+    plugins: [bulleSousLeDoigt],
+  });
+}
 
 let graphiquePosition = null;
 function dessinerPositionnement(mesures) {
@@ -833,11 +1042,11 @@ function dessinerPositionnement(mesures) {
     type: "scatter",
     data: { datasets: points.map((m) => ({ label: m.hotel, data: [{ x: m.indice, y: m.multi }], backgroundColor: couleur(m.hotel), borderColor: carte, borderWidth: 2, pointRadius: 7, pointHoverRadius: 9 })) },
     options: {
-      responsive: true, maintainAspectRatio: false,
+      responsive: true, maintainAspectRatio: false, events: EVENEMENTS_GRAPHIQUE,
       layout: { padding: { top: 6, right: 8 } },
       plugins: {
         legend: { display: false },
-        tooltip: { callbacks: { label: (c) => ` ${c.dataset.label} : indice ${c.parsed.x}, note ${sur10(c.parsed.y)} /10` } },
+        tooltip: { ...styleBulle(), callbacks: { label: (c) => ` ${c.dataset.label} : indice ${c.parsed.x}, note ${sur10(c.parsed.y)} /10` } },
       },
       scales: {
         x: { title: { display: true, text: "Indice de prix (100 = prix médian)", color: texte2 }, grid: { color: grille },
@@ -846,7 +1055,7 @@ function dessinerPositionnement(mesures) {
           suggestedMin: Math.floor(Math.min(...ys) - 0.5), suggestedMax: Math.min(10, Math.ceil(Math.max(...ys) + 0.3)), ticks: { color: texte2 } },
       },
     },
-    plugins: [reperes],
+    plugins: [reperes, bulleSousLeDoigt],
   });
 }
 
@@ -943,16 +1152,17 @@ function dessinerGraphique() {
       })),
     },
     options: {
-      responsive: true, maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
+      responsive: true, maintainAspectRatio: false, interaction: { mode: "index", intersect: false }, events: EVENEMENTS_GRAPHIQUE,
       plugins: {
         legend: { position: "bottom", labels: { color: texte2, usePointStyle: true, pointStyle: "circle", boxWidth: 8, boxHeight: 8, padding: 14 } },
-        tooltip: { itemSort: (a, b) => a.parsed.y - b.parsed.y, callbacks: { label: (c) => " " + c.dataset.label + " : " + euros(c.parsed.y) } },
+        tooltip: { ...styleBulle(), itemSort: (a, b) => a.parsed.y - b.parsed.y, callbacks: { label: (c) => " " + c.dataset.label + " : " + euros(c.parsed.y) } },
       },
       scales: {
         x: { grid: { display: false }, ticks: { color: texte2, maxRotation: 0, autoSkipPadding: 12 } },
         y: { grid: { color: grille }, border: { display: false }, ticks: { color: texte2, callback: (v) => v + " €" } },
       },
     },
+    plugins: [bulleSousLeDoigt],
   });
 }
 
@@ -1134,10 +1344,39 @@ document.addEventListener("click", (e) => {
   if (b) suivre(b.dataset.suivre);
 });
 
+let zoneCercle = null;
+// Curseur du rayon : le cercle suit le doigt ; la carte (listes, OpenStreetMap) se met à jour au lâcher
+$("rayon").addEventListener("input", () => {
+  const r = Number($("rayon").value);
+  $("rayon-valeur").textContent = km(r);
+  if (zoneCercle) zoneCercle.setRadius(r * 1000);
+});
+$("rayon").addEventListener("change", () => {
+  etat.zoneCarte = { ...etat.zoneCarte, rayon_km: Number($("rayon").value) };
+  if (carte && zoneCercle) carte.fitBounds(zoneCercle.getBounds(), { padding: [20, 20], maxZoom: 16 });
+  etat.cadrerCarte = false;
+  dessinerCarte();
+});
+$("b-zone-enregistrer").addEventListener("click", async () => {
+  const z = etat.zoneCarte;
+  if (!confirm(`Enregistrer la zone de chalandise : ${km(z.rayon_km)} autour du point choisi ?`)) return;
+  try {
+    const r = await serveur("collecterDepuisPage", { action: "zone", latitude: z.latitude, longitude: z.longitude, rayon_km: z.rayon_km });
+    toast(r.message);
+    if (r.faite) { etat.zoneCarte = null; await charger(); }
+  } catch (e) { toast("Impossible : " + (e.message || e)); }
+});
+
 async function dessinerCarte() {
   try { await chargerLeaflet(); } catch (e) { $("carte").innerHTML = `<p class="vide">${echapper(e.message)}</p>`; return; }
-  const z = etat.reglages.zone || { latitude: 42.7906, longitude: 0.5947, rayon_km: 2 };
+  // Zone affichée : celle des Réglages, ou celle en cours de réglage (curseur, point central déplacé)
+  if (!etat.zoneCarte) etat.zoneCarte = { ...(etat.reglages.zone || { latitude: 42.7906, longitude: 0.5947, rayon_km: 2 }) };
+  const z = etat.zoneCarte;
   const centre = [z.latitude, z.longitude];
+  $("rayon").value = z.rayon_km;
+  $("rayon-valeur").textContent = km(z.rayon_km);
+  const zr = etat.reglages.zone || {};
+  $("b-zone-enregistrer").disabled = z.rayon_km === zr.rayon_km && z.latitude === zr.latitude && z.longitude === zr.longitude;
   const css = getComputedStyle(document.documentElement);
   if (!carte) {
     carte = L.map("carte", { scrollWheelZoom: false }).setView(centre, 14);
@@ -1151,9 +1390,19 @@ async function dessinerCarte() {
 
   // La zone de collecte : une surface autour du centre
   const accent = css.getPropertyValue("--accent").trim();
-  const zone = L.circle(centre, { radius: z.rayon_km * 1000, color: accent, weight: 2, fillColor: accent, fillOpacity: 0.1 })
-    .bindTooltip(`Zone de collecte : ${km(z.rayon_km)} autour du centre`, { sticky: true }).addTo(coucheCarte);
-  L.circleMarker(centre, { radius: 3, color: accent, fillColor: accent, fillOpacity: 1, weight: 1 }).bindTooltip("Centre de la zone").addTo(coucheCarte);
+  const zone = L.circle(centre, { radius: z.rayon_km * 1000, color: accent, weight: 2, fillColor: accent, fillOpacity: 0.1, interactive: false }).addTo(coucheCarte);
+  zoneCercle = zone;
+  // Point central déplaçable : la zone suit, puis la carte se redessine
+  const pointCentral = L.marker(centre, { draggable: true, autoPan: true, zIndexOffset: 1000,
+    icon: L.divIcon({ className: "", html: '<div class="centre-zone"></div>', iconSize: [22, 22], iconAnchor: [11, 11] }) })
+    .bindTooltip("Centre de la zone : glissez-le pour la déplacer").addTo(coucheCarte);
+  pointCentral.on("drag", (e) => zone.setLatLng(e.target.getLatLng()));
+  pointCentral.on("dragend", (e) => {
+    const ll = e.target.getLatLng();
+    etat.zoneCarte = { ...etat.zoneCarte, latitude: Math.round(ll.lat * 1e5) / 1e5, longitude: Math.round(ll.lng * 1e5) / 1e5 };
+    etat.cadrerCarte = false;
+    dessinerCarte();
+  });
 
   const series = seriesSejour(etat.sejour);
   const points = [];
@@ -1191,10 +1440,13 @@ async function dessinerCarte() {
         ${n && !isNaN(n.note) ? "<br>Note " + n.note.toFixed(1).replace(".", ",") + " /10" : ""}
         <br><span style="color:#75746f">${km(d)} du centre${d > z.rayon_km ? " · hors zone" : ""}</span>`).addTo(coucheCarte);
   });
-  // Cadrage : la zone et tous les points
-  const cadre = zone.getBounds();
-  points.forEach((pt) => cadre.extend(pt));
-  carte.fitBounds(cadre, { padding: [20, 20], maxZoom: 16 });
+  // Cadrage : la zone et tous les points (pas pendant un réglage de la zone, pour ne pas faire sauter la carte)
+  if (etat.cadrerCarte !== false) {
+    const cadre = zone.getBounds();
+    points.filter((pt) => distanceKm(centre, pt) <= z.rayon_km * 1.5).forEach((pt) => cadre.extend(pt));
+    carte.fitBounds(cadre, { padding: [20, 20], maxZoom: 16 });
+  }
+  etat.cadrerCarte = true;
 
   // Listes
   const dansZone = (pos) => distanceKm(centre, pos) <= z.rayon_km;
@@ -1252,13 +1504,26 @@ function dessinerPilotage(d) {
   }
   $("p-automatisme").textContent = `Collecte chaque jour vers ${r.heure} h${r.a_l_ouverture ? " et à l'ouverture du classeur" : ""} · ${r.fiches_par_jour} fiche${r.fiches_par_jour > 1 ? "s" : ""} détaillée${r.fiches_par_jour > 1 ? "s" : ""} (prix site par site) par collecte, à tour de rôle.`;
   $("p-hotels").innerHTML = r.hotels.map((h) => `<li>${echapper(h)}</li>`).join("") || "<li>aucun</li>";
-  $("p-dates").innerHTML = r.dates.map((x) => `<li>${echapper(x.nom)} : ${dateLongue(x.arrivee)}</li>`).join("") || "<li>aucune date à venir</li>";
+  $("p-dates").innerHTML = r.dates.map((x) => `<li>${echapper(x.nom)} : ${dateLongue(x.arrivee)}
+    <button type="button" class="bouton" style="min-height:26px;padding:1px 8px;font-size:.78rem;margin-left:6px" data-retirer-date="${echapper(x.nom)}">retirer</button></li>`).join("") || "<li>aucune date à venir</li>";
   $("lien-reglages").href = d.urlReglages;
   $("lien-classeur").href = d.urlClasseur;
   $("p-journal").innerHTML = etat.journal.length ? etat.journal.map((j) =>
     `<details><summary><span>${echapper(j.date)}</span>${echapper(j.resultat)}</summary><div class="resultat">${echapper(j.detail || "(pas de détail)")}</div></details>`).join("")
     : `<p class="discret">Aucune collecte enregistrée pour l'instant.</p>`;
 }
+
+$("p-dates").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-retirer-date]");
+  if (!b) return;
+  const nom = b.dataset.retirerDate;
+  if (!confirm(`Ne plus suivre le séjour « ${nom} » ? Son historique de prix est gardé.`)) return;
+  try {
+    const r = await serveur("collecterDepuisPage", { action: "retirerDate", nom });
+    toast(r.message);
+    if (r.faite) await charger();
+  } catch (err) { toast("Impossible : " + (err.message || err)); }
+});
 
 document.querySelectorAll("[data-action]").forEach((b) => b.addEventListener("click", () => {
   const action = b.dataset.action;

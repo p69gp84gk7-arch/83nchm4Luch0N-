@@ -180,6 +180,9 @@ Il **s'ouvre tout seul avec le classeur** (réglage « Ouvrir le tableau de bord
 Si la collecte du jour n'est pas faite, il la lance et se met à jour tout seul. La même page est publiée sur GitHub Pages (voir « La page web sur GitHub Pages »).
 
 - **En haut** : date du dernier relevé, état de la collecte, bouton **Relancer la collecte**, puis le **séjour suivi** (Noël, février…) : un clic change toute la page.
+- **Ajouter une date de séjour** : bouton **« + Comparer une date »** à côté des séjours : date d'arrivée, nom facultatif, et
+  relevé immédiat des prix de tous les hôtels (1 requête). La date est ensuite suivie à chaque collecte ; on la retire dans le Pilotage
+  (son historique est gardé). Sur la page GitHub, le code d'accès est demandé.
 - **Aperçu** : les indicateurs (le moins cher, prix médian, le mieux noté, hôtels avec un prix) et une **carte par hôtel** :
   photo, étoiles, note /10 et avis, prix le plus bas au dernier relevé et son site (avec le lien « voir l'offre »),
   évolution depuis le premier relevé (▲ hausse, ▼ baisse), mini-courbe, restaurant et petit-déjeuner.
@@ -189,11 +192,14 @@ Si la collecte du jour n'est pas faite, il la lance et se met à jour tout seul.
   ramenées sur 10 et pondérées par le nombre d'avis), nombre d'avis tous sites, note de chaque site, note d'**emplacement**,
   **mentions positives** des avis, **taux de réponse aux avis**, **parité** site officiel / agences, petit-déjeuner inclus,
   annulation gratuite, prix habituel. Meilleur de chaque colonne en gras, tri par colonne, **export CSV** (Excel).
-  Plus : le **positionnement prix / satisfaction** (graphique à quadrants), les **points forts et faibles** de chaque hôtel
+  Plus : deux **graphiques en colonnes**, la **satisfaction des clients** (part de mentions positives) et la **répartition des avis
+  par étoiles** ; posez le doigt sur une colonne (ou glissez) : le détail s'affiche, et disparaît quand le doigt se lève.
+  Puis le **positionnement prix / satisfaction** (graphique à quadrants), les **points forts et faibles** de chaque hôtel
   (thèmes des avis) et les **avis récents** (note, sous-notes, réponse de l'hôtel, extrait ; sans le nom des auteurs).
 - **Évolution** : le graphique des prix (période, site, courbes par hôtel ou par catégorie) et le tableau comparatif triable.
 - **Comparer** : choisissez 2 hôtels ou plus (ou cochez « Comparer » sur les cartes) pour voir leurs prix site par site et leurs offres.
-- **Carte** : la **zone de collecte** (un cercle autour de Luchon, réglable dans les Réglages : centre et rayon), les **hôtels suivis**
+- **Carte** : la **zone de chalandise** (un cercle autour de Luchon) : **curseur** pour l'élargir ou la réduire (0,5 à 20 km),
+  **point central à glisser** pour la déplacer, bouton **« Enregistrer cette zone »** (pour tous les appareils), les **hôtels suivis**
   (leur couleur ; clic = prix du séjour choisi, note, distance au centre, « hors zone ») et, en gris, les **autres établissements**
   trouvés par Google au dernier relevé (gris plein, avec prix et note) ainsi que **tous les hébergements de la zone connus
   d'OpenStreetMap** (gris vide : hôtels, chambres d'hôtes, résidences…, même ceux que Google ne renvoie pas). Les positions viennent
@@ -203,6 +209,15 @@ Si la collecte du jour n'est pas faite, il la lance et se met à jour tout seul.
   résumé des réglages (bouton « Modifier les réglages ») ; journal des dernières collectes, avec le détail hôtel par hôtel.
 
 ---
+
+## Le site Internet des hôteliers
+
+- Chaque fiche d'hôtel a un bouton **« Site de l'hôtel »** (et **« Appeler »**), d'après Google Hotels.
+- Le **prix pratiqué sur le site de l'hôtel** est affiché quand Google Hotels le relève (offre « site officiel », venant du moteur de
+  réservation de l'hôtel) : sur la fiche (« Sur le site de l'hôtel : … € ») et dans le Benchmark (colonnes « Prix site de l'hôtel » et
+  « Parité officiel / agences »).
+- Lire directement les prix sur chaque site d'hôtel demanderait un programme différent pour chaque moteur de réservation, fragile et
+  souvent contraire à leurs conditions d'utilisation : l'outil s'appuie donc sur ce que Google Hotels collecte auprès des hôtels.
 
 ## Bon à savoir
 

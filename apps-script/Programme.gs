@@ -27,7 +27,7 @@ const URL_COMPTE = 'https://serpapi.com/account.json'; // consulter son compte n
 // La page (index.html, aussi publiée sur GitHub Pages) est lue sur GitHub, comme le programme
 const URL_PAGE = 'https://raw.githubusercontent.com/p69gp84gk7-arch/83nchm4Luch0N-/main/index.html';
 // Actions de la page web qui consomment des requêtes : elles demandent le code d'accès des Réglages
-const ACTIONS_PROTEGEES = ['collecte', 'essai', 'fiches', 'suivre'];
+const ACTIONS_PROTEGEES = ['collecte', 'essai', 'fiches', 'suivre', 'zone', 'ajouterDate', 'retirerDate'];
 
 // Onglets de données et leurs colonnes (l'ordre compte, l'onglet Synthèse s'en sert)
 const ONGLETS = {
@@ -347,6 +347,57 @@ function suivreHotel(nom) {
     message: '« ' + nom + ' » ajouté aux hôtels suivis : il sera recherché sur Google Hotels à la prochaine collecte.' };
 }
 
+/** Enregistre la zone de chalandise (centre et rayon) dans les Réglages, depuis la carte. */
+function enregistrerZone(z) {
+  const lat = Number(z.latitude), lng = Number(z.longitude), rayon = Math.round(Number(z.rayon_km) * 10) / 10;
+  if (!(lat > 41 && lat < 44 && lng > -1.5 && lng < 3.5) || !(rayon >= 0.5 && rayon <= 30)) {
+    return { ok: false, faite: false, message: 'Zone refusée : centre dans les Pyrénées et rayon entre 0,5 et 30 km.', journal: '' };
+  }
+  const centre = celluleReglage('Zone de collecte : centre (latitude, longitude)');
+  const cRayon = celluleReglage('Zone de collecte : rayon (km)');
+  if (!centre || !cRayon) return { ok: false, faite: false, message: 'Lignes « Zone de collecte » introuvables dans les Réglages.', journal: '' };
+  centre.setValue(lat.toFixed(5) + ', ' + lng.toFixed(5));
+  cRayon.setValue(rayon);
+  return { ok: true, faite: true, journal: '', message: 'Zone enregistrée : ' + String(rayon).replace('.', ',') + ' km autour du centre choisi.' };
+}
+
+/** Ajoute une date de séjour à suivre (et relève tout de suite ses prix si demandé : 1 requête). */
+function ajouterDateSejour(d) {
+  const nom = String(d.nom || '').replace(/^[=+\-@\s]+/, '').trim().slice(0, 40);
+  const arrivee = String(d.arrivee || '');
+  if (!nom || !/^[\p{L}\d][\p{L}\d\s'’&.,\-\/]*$/u.test(nom)) return { ok: false, faite: false, message: 'Nom de séjour refusé.', journal: '' };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(arrivee) || arrivee <= aujourdhui()) {
+    return { ok: false, faite: false, message: "La date d'arrivée doit être après aujourd'hui.", journal: '' };
+  }
+  const cfg = lireReglages();
+  if (cfg.dates.some(x => String(x.nom).toLowerCase() === nom.toLowerCase())) {
+    return { ok: false, faite: false, message: 'Un séjour porte déjà ce nom.', journal: '' };
+  }
+  const feuille = classeur().getSheetByName('Réglages');
+  const valeurs = feuille.getRange(1, 1, feuille.getLastRow() + 1, 5).getValues();
+  const titre = valeurs.findIndex(l => String(l[0]).trim() === 'Hôtels suivis');
+  if (titre < 0) return { ok: false, faite: false, message: 'Liste des dates introuvable dans les Réglages.', journal: '' };
+  let ligne = titre + 2;
+  while (ligne < valeurs.length && String(valeurs[ligne][3]).trim()) ligne++;
+  feuille.getRange(ligne + 1, 4, 1, 2).setValues([[nom, versDate(arrivee)]]);
+  if (!d.collecter) {
+    return { ok: true, faite: true, journal: '', message: '« ' + nom + ' » ajouté : ses prix seront relevés à chaque collecte.' };
+  }
+  const r = collecter({ forcer: true, sejour: nom });
+  return { ok: r.ok, faite: true, journal: r.journal, message: '« ' + nom + ' » ajouté. ' + r.message };
+}
+
+/** Retire une date de séjour des Réglages (son historique reste dans l'onglet Prix). */
+function retirerDateSejour(nom) {
+  const feuille = classeur().getSheetByName('Réglages');
+  const valeurs = feuille.getRange(1, 1, feuille.getLastRow(), 5).getValues();
+  const titre = valeurs.findIndex(l => String(l[0]).trim() === 'Hôtels suivis');
+  const i = valeurs.findIndex((l, k) => k > titre + 1 && String(l[3]).trim() === String(nom || '').trim());
+  if (titre < 0 || i < 0) return { ok: false, faite: false, message: 'Séjour introuvable dans les Réglages.', journal: '' };
+  feuille.getRange(i + 1, 4, 1, 2).setValues([['', '']]);
+  return { ok: true, faite: true, journal: '', message: '« ' + nom + ' » retiré (son historique est gardé).' };
+}
+
 /** Garde la dernière ligne de chaque clé (ex. hôtel + site). */
 function dernieresLignes(lignes, cle) {
   const m = {};
@@ -382,7 +433,8 @@ function etatCollecte() {
 
 /**
  * Actions du tableau de bord. Le chargeur ne transmet qu'un argument : soit vrai/faux (forcer la collecte),
- * soit une demande { action: 'collecte' | 'auto' | 'essai' | 'fiches', hotel } ou { action: 'suivre', nom }.
+ * soit une demande { action: 'collecte' | 'auto' | 'essai' | 'fiches', hotel }, { action: 'suivre', nom },
+ * { action: 'zone', latitude, longitude, rayon_km }, { action: 'ajouterDate', nom, arrivee, collecter } ou { action: 'retirerDate', nom }.
  */
 function collecterDepuisPage(demande) {
   if (demande && typeof demande === 'object') {
@@ -390,6 +442,9 @@ function collecterDepuisPage(demande) {
     if (demande.action === 'fiches') return collecter({ forcer: true, fiches: true });
     if (demande.action === 'auto') return collecter({}); // ouverture du tableau de bord : respecte la fréquence
     if (demande.action === 'suivre') return suivreHotel(demande.nom);
+    if (demande.action === 'zone') return enregistrerZone(demande);
+    if (demande.action === 'ajouterDate') return ajouterDateSejour(demande);
+    if (demande.action === 'retirerDate') return retirerDateSejour(demande.nom);
     return collecter({ forcer: true });
   }
   return collecter({ forcer: !!demande });
@@ -451,6 +506,8 @@ function collecterSansVerrou(opts, journal) {
   const jetonsConnus = {};
   Object.keys(fichesConnues).forEach(h => { if (fichesConnues[h].property_token) jetonsConnus[h] = fichesConnues[h].property_token; });
 
+  if (opts.sejour) sejours = sejours.filter(x => x.nom === opts.sejour);
+  if (!sejours.length) return { ok: false, faite: false, journal: journal.join('\n'), message: 'Séjour « ' + opts.sejour + ' » introuvable ou déjà passé.' };
   let hotels = cfg.hotels;
   if (opts.essai) {
     const choisis = opts.hotel ? hotels.filter(h => ressemblance(h.nom, opts.hotel) >= 0.6) : hotels;
@@ -460,13 +517,14 @@ function collecterSansVerrou(opts, journal) {
 
   // Fiches détaillées (prix site par site) : quelques-unes chaque jour, à tour de rôle ;
   // toutes d'un coup avec le menu « Collecte + fiches détaillées » ; une seule pour un essai
-  const nbFichesVoulues = opts.essai ? 1 : opts.fiches ? hotels.length : cfg.fiches_par_jour;
-  const nbAvisVoulus = opts.essai ? 0 : cfg.avis_par_jour; // avis récents : un hôtel par requête, à tour de rôle
+  const nbFichesVoulues = opts.sejour ? 0 : opts.essai ? 1 : opts.fiches ? hotels.length : cfg.fiches_par_jour;
+  const nbAvisVoulus = opts.essai || opts.sejour ? 0 : cfg.avis_par_jour; // avis récents : un hôtel par requête, à tour de rôle
 
   // --- Budget : ne jamais dépasser le quota SerpApi ---
   const budget = budgetCollecte(cfg, compte, sejours, nbFichesVoulues, nbAvisVoulus, !!opts.essai, journal);
   if (budget.arret) return { ok: false, faite: false, journal: journal.join('\n'), message: budget.arret };
   sejours = budget.sejours;
+  if (opts.sejour) budget.cibles = 0; // relevé ponctuel d'une seule date
 
   // --- 1) Recherche par date : prix par site + notes, pour tous les hôtels d'un coup ---
   let prix = [];
