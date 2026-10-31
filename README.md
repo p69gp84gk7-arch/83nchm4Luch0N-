@@ -24,11 +24,13 @@ SerpApi les récupère pour nous : c'est la **seule** clé de l'outil, et elle s
 
 | Fichier | Rôle |
 |---|---|
-| `apps-script/Chargeur.gs` | Le chargeur, collé **une seule fois** dans Apps Script : il lit le programme sur GitHub |
-| `apps-script/Code.gs` | Le programme : collecte, automatisation, actions du menu, page web |
+| `apps-script/Code.gs` | Le **chargeur**, collé **une seule fois** dans Apps Script : il lit le programme sur GitHub |
+| `apps-script/Programme.gs` | Le programme : collecte, automatisation, actions du menu, tableau de bord |
+| `apps-script/appsscript.json` | Réglages du projet Apps Script ; sert aussi à mettre à jour les toutes premières installations |
 | `apps-script/Page.html` | La page web (graphique, tableau, comparateur) |
 
 Le dépôt garde le code et son historique. Le chargeur du classeur lit le programme et la page dans la branche `main`.
+Les installations plus anciennes (programme collé directement, premier chargeur) passent toutes seules au chargeur actuel au premier clic sur « Mettre à jour » du menu.
 
 ---
 
@@ -59,7 +61,7 @@ Il va lire le vrai programme sur GitHub et prend tout seul chaque nouvelle versi
 ### 2. Coller le chargeur
 
 1. Dans le classeur : menu **Extensions → Apps Script**.
-2. Ouvrez <https://raw.githubusercontent.com/p69gp84gk7-arch/83nchm4Luch0N-/main/apps-script/Chargeur.gs>, sélectionnez tout, copiez.
+2. Ouvrez <https://raw.githubusercontent.com/p69gp84gk7-arch/83nchm4Luch0N-/main/apps-script/Code.gs>, sélectionnez tout, copiez.
 3. Dans `Code.gs` : effacez **tout**, collez, puis **enregistrez** (icône disquette).
 
 ### 3. Exécuter « installer »
@@ -104,10 +106,10 @@ Gardez l'adresse (elle finit par `/exec`) dans vos favoris, sur téléphone auss
 
 | Menu | Ce qu'il fait | Coût |
 |---|---|---|
+| Ouvrir le tableau de bord | Aperçu, évolution, comparaison, pilotage (voir plus bas) | gratuit |
 | Lancer la collecte maintenant | Collecte complète | ~4 requêtes (+8 le jour des fiches) |
 | Essai | 1 hôtel, 1 date, n'enregistre rien | 2 requêtes |
 | Collecte + fiches détaillées | Collecte complète + fiches de tous les hôtels | ~12 requêtes |
-| Voir le compteur SerpApi | Ouvre le tableau de bord (compteur dans l'onglet Pilotage) | gratuit |
 | Enregistrer la clé SerpApi | Remplace la clé (ou collez-la dans Réglages) | gratuit |
 | Activer / Désactiver l'automatisation | Collecte quotidienne et à l'ouverture | — |
 | Mettre à jour le programme depuis GitHub | Prend tout de suite la dernière version | gratuit |
@@ -158,7 +160,7 @@ Pour estimer un changement : **(dates × 30 ÷ fréquence) + (hôtels × 4,3)**.
 ## Le tableau de bord
 
 Il **s'ouvre tout seul avec le classeur** (réglage « Ouvrir le tableau de bord à l'ouverture »), et à tout moment par le menu
-**Veille hôtels → Voir le compteur SerpApi** (le compteur est en haut de l'onglet Pilotage).
+**Veille hôtels → Ouvrir le tableau de bord** (le compteur SerpApi est dans l'onglet Pilotage).
 Si la collecte du jour n'est pas faite, il la lance et se met à jour tout seul. La même page sert d'application Web sur téléphone (voir plus haut).
 
 - **En haut** : date du dernier relevé, état de la collecte, bouton **Relancer la collecte**, puis le **séjour suivi** (Noël, février…) : un clic change toute la page.
