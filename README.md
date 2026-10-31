@@ -41,6 +41,7 @@ Les installations plus anciennes (programme collé directement, premier chargeur
 | **Synthèse** | Une ligne par hôtel : étoiles, dernier prix, site le moins cher, prix le plus bas et sa date, évolution, note sur 10, avis, restauration. Choisissez le séjour dans la cellule jaune. |
 | **Réglages** | Hôtels suivis, dates de séjour, fréquence, heure, quota. **C'est le seul onglet à modifier.** |
 | **Prix**, **Avis**, **Hôtels**, **Compteur** | Les relevés bruts, ajoutés par le script à chaque collecte. Rien n'est jamais effacé. |
+| **Établissements** | Tous les établissements renvoyés par Google à chaque collecte (suivis ou non), avec position GPS, prix et note : ils alimentent la carte. |
 | **Journal** | Le compte rendu de chaque collecte (hôtels trouvés ou « non trouvé », requêtes utilisées), le plus récent en haut. |
 | **Sources** | D'où viennent les données. |
 
@@ -181,6 +182,10 @@ Si la collecte du jour n'est pas faite, il la lance et se met à jour tout seul.
   Une carte grisée = pas de prix pour ce séjour (complet, fermé ou non trouvé). Triez par prix, note, baisse ou nom.
 - **Évolution** : le graphique des prix (période, site, courbes par hôtel ou par catégorie) et le tableau comparatif triable.
 - **Comparer** : choisissez 2 hôtels ou plus (ou cochez « Comparer » sur les cartes) pour voir leurs prix site par site et leurs offres.
+- **Carte** : la **zone de collecte** (un cercle autour de Luchon, réglable dans les Réglages : centre et rayon), les **hôtels suivis**
+  (leur couleur ; clic = prix du séjour choisi, note, distance au centre, « hors zone ») et, en gris, les **autres établissements**
+  trouvés par Google au dernier relevé : les concurrents non suivis, avec leur prix et leur note. Les positions viennent de
+  Google Hotels, sans requête en plus (onglet **Établissements** du classeur).
 - **Pilotage** : lancer une collecte, une collecte avec fiches détaillées ou un essai sur un hôtel ; compteur SerpApi et estimation mensuelle ;
   résumé des réglages (bouton « Modifier les réglages ») ; journal des dernières collectes, avec le détail hôtel par hôtel.
 
