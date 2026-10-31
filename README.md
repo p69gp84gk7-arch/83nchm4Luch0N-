@@ -39,6 +39,7 @@ Le dépôt garde le code et son historique. Le chargeur du classeur lit le progr
 | **Synthèse** | Une ligne par hôtel : étoiles, dernier prix, site le moins cher, prix le plus bas et sa date, évolution, note sur 10, avis, restauration. Choisissez le séjour dans la cellule jaune. |
 | **Réglages** | Hôtels suivis, dates de séjour, fréquence, heure, quota. **C'est le seul onglet à modifier.** |
 | **Prix**, **Avis**, **Hôtels**, **Compteur** | Les relevés bruts, ajoutés par le script à chaque collecte. Rien n'est jamais effacé. |
+| **Journal** | Le compte rendu de chaque collecte (hôtels trouvés ou « non trouvé », requêtes utilisées), le plus récent en haut. |
 | **Sources** | D'où viennent les données. |
 
 ---
