@@ -32,7 +32,7 @@ const ONGLETS = {
   prix: ['Prix', ['date_releve', 'hotel', 'sejour', 'date_sejour', 'site', 'prix_nuit_eur', 'offre', 'lien']],
   avis: ['Avis', ['date_releve', 'hotel', 'note', 'note_sur_10', 'nombre_avis', 'notes_detaillees']],
   hotels: ['Hôtels', ['date_maj', 'hotel', 'nom_google', 'categorie_etoiles', 'restaurant_sur_place',
-                      'petit_dejeuner_propose', 'equipements_principaux', 'property_token']],
+                      'petit_dejeuner_propose', 'equipements_principaux', 'property_token', 'photo']],
   compteur: ['Compteur', ['date_releve', 'requetes_ce_lancement', 'requetes_ce_mois', 'quota_mois',
                           'requetes_restantes']],
 };
@@ -129,11 +129,13 @@ function menuEssai() {
   afficherResultat(collecter({ essai: true, hotel: rep.getResponseText().trim() }));
 }
 
-function menuQuota() {
-  const ui = SpreadsheetApp.getUi();
-  if (!cle()) return ui.alert("Aucune clé SerpApi enregistrée : menu Veille hôtels > Enregistrer la clé SerpApi.");
-  const compte = lireCompte();
-  ui.alert('Compteur SerpApi', texteQuota(compte) || 'Compteur illisible pour le moment.', ui.ButtonSet.OK);
+/** Menu « Voir le compteur SerpApi » : ouvre le tableau de bord, qui affiche le compteur en haut. */
+function menuQuota() { ouvrirTableauDeBord(); }
+
+/** Ouvre le tableau de bord dans une grande fenêtre par-dessus le classeur. */
+function ouvrirTableauDeBord() {
+  const page = HtmlService.createHtmlOutput(UrlFetchApp.fetch(URL_PAGE).getContentText()).setWidth(1200).setHeight(820);
+  SpreadsheetApp.getUi().showModelessDialog(page, 'Veille hôtels Luchon');
 }
 
 function menuCle() {
@@ -214,6 +216,9 @@ function collecteAutomatique() {
 function collecteALouverture() {
   rangerCleDesReglages();
   const cfg = lireReglages();
+  if (cfg.tableau_a_l_ouverture) {
+    try { ouvrirTableauDeBord(); return; } catch (e) { console.log('Tableau de bord impossible à ouvrir : ' + e.message); }
+  }
   if (!cfg.a_l_ouverture || !cle() || derniereCollecte() === aujourdhui()) return;
   message('Collecte du jour en cours (environ 1 minute)…', 60);
   const r = collecter({});
@@ -236,20 +241,65 @@ function doGet() {
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
-/** Données pour la page web : toutes les lignes des 4 onglets, dates au format AAAA-MM-JJ. */
+/** Données du tableau de bord : relevés (dates en AAAA-MM-JJ), réglages, journal et état de la collecte. */
 function lireDonnees() {
+  const cfg = lireReglages();
+  const reglages = classeur().getSheetByName('Réglages');
   return {
-    prix: lireObjets('prix'), avis: lireObjets('avis'), hotels: lireObjets('hotels'),
-    usage: lireObjets('compteur'), urlClasseur: classeur().getUrl(),
+    prix: lireObjets('prix'), avis: lireObjets('avis'), hotels: lireObjets('hotels'), usage: lireObjets('compteur'),
+    reglages: {
+      hotels: cfg.hotels.map(h => h.nom),
+      dates: datesValides(cfg, []).map(d => ({ nom: d.nom, arrivee: d.arrivee })),
+      heure: cfg.heure, frequence_jours: cfg.frequence_jours, jour_fiches: cfg.jour_fiches,
+      a_l_ouverture: cfg.a_l_ouverture, quota: cfg.quota,
+    },
+    journal: lireJournal(15),
+    budget: (() => {
+      const dernier = lireObjets('compteur').pop();
+      const compte = dernier && dernier.requetes_restantes !== '' ? { plan_searches_left: Number(dernier.requetes_restantes) } : {};
+      const p = projectionMois(cfg, datesValides(cfg, []).length);
+      return { restantes: requetesRestantes(cfg, compte).valeur, reserve: cfg.marge, besoin: p.total, joursRestants: p.joursRestants };
+    })(),
+    etat: {
+      cleOk: !!cle(), faite: derniereCollecte() === aujourdhui(), aOuverture: cfg.a_l_ouverture,
+      derniereCollecte: valeurReglage('Dernière collecte'), miseAJour: valeurReglage('Mise à jour du script'),
+    },
+    urlClasseur: classeur().getUrl(),
+    urlReglages: classeur().getUrl() + (reglages ? '#gid=' + reglages.getSheetId() : ''),
   };
+}
+
+function valeurReglage(libelle) {
+  const cellule = celluleReglage(libelle);
+  return cellule ? String(cellule.getDisplayValue()) : '';
+}
+
+/** Les dernières lignes de l'onglet Journal : [{ date, resultat, detail }]. */
+function lireJournal(n) {
+  const feuille = classeur().getSheetByName('Journal');
+  if (!feuille || feuille.getLastRow() < 2) return [];
+  return feuille.getRange(2, 1, Math.min(n, feuille.getLastRow() - 1), 3).getValues().map(l => ({
+    date: l[0] instanceof Date ? Utilities.formatDate(l[0], FUSEAU, 'dd/MM/yyyy HH:mm') : String(l[0]),
+    resultat: String(l[1]), detail: String(l[2]),
+  }));
 }
 
 function etatCollecte() {
   return { cleOk: !!cle(), faite: derniereCollecte() === aujourdhui(), aOuverture: lireReglages().a_l_ouverture };
 }
 
-function collecterDepuisPage(forcer) {
-  return collecter({ forcer: !!forcer });
+/**
+ * Actions du tableau de bord. Le chargeur ne transmet qu'un argument : soit vrai/faux (forcer la collecte),
+ * soit une demande { action: 'collecte' | 'auto' | 'essai' | 'fiches', hotel }.
+ */
+function collecterDepuisPage(demande) {
+  if (demande && typeof demande === 'object') {
+    if (demande.action === 'essai') return collecter({ essai: true, hotel: String(demande.hotel || '').trim() });
+    if (demande.action === 'fiches') return collecter({ forcer: true, fiches: true });
+    if (demande.action === 'auto') return collecter({}); // ouverture du tableau de bord : respecte la fréquence
+    return collecter({ forcer: true });
+  }
+  return collecter({ forcer: !!demande });
 }
 
 
@@ -321,22 +371,11 @@ function collecterSansVerrou(opts, journal) {
     ? hotels.map(h => h.nom)
     : hotels.filter(h => !fichesConnues[h.nom]).map(h => h.nom);
 
-  // --- Budget : a-t-on assez de requêtes ? ---
-  const besoinRecherche = sejours.length * cfg.pages_max;
-  if (typeof compte.plan_searches_left === 'number') {
-    const disponible = compte.plan_searches_left - cfg.marge;
-    if (fichesPour.length && disponible < besoinRecherche + fichesPour.length) {
-      journal.push('! Quota presque épuisé : pas de fiches détaillées aujourd\'hui.');
-      fichesPour = [];
-    }
-    if (disponible < besoinRecherche) {
-      const garde = Math.max(0, Math.floor(disponible / cfg.pages_max));
-      if (!garde) return { ok: false, faite: false, journal: journal.join('\n'),
-        message: 'Quota SerpApi épuisé (ou réserve atteinte) : collecte annulée.' };
-      journal.push('! Quota presque épuisé : seulement ' + garde + ' date(s) aujourd\'hui.');
-      sejours = sejours.slice(0, garde);
-    }
-  }
+  // --- Budget : ne jamais dépasser le quota SerpApi ---
+  const budget = budgetCollecte(cfg, compte, sejours, fichesPour, !!opts.essai, journal);
+  if (budget.arret) return { ok: false, faite: false, journal: journal.join('\n'), message: budget.arret };
+  sejours = budget.sejours;
+  fichesPour = budget.fichesPour;
 
   // --- 1) Recherche par date : prix par site + notes, pour tous les hôtels d'un coup ---
   let prix = [];
@@ -398,15 +437,25 @@ function collecterSansVerrou(opts, journal) {
     const resto = restauration(p);
     fiches.push({ date_maj: jour, hotel: h.nom, nom_google: p.name || '', categorie_etoiles: etoiles(p),
       restaurant_sur_place: resto[0], petit_dejeuner_propose: resto[1],
-      equipements_principaux: (p.amenities || []).slice(0, 12).join(', '), property_token: p.property_token || '' });
+      equipements_principaux: (p.amenities || []).slice(0, 12).join(', '), property_token: p.property_token || '',
+      photo: photo(p) });
   });
 
   const compteApres = lireCompte();
   journal.push('Requêtes utilisées par ce lancement : ' + etat.requetes);
   if (texteQuota(compteApres)) journal.push(texteQuota(compteApres));
 
+  // Le compteur note aussi les essais : il sert d'estimation si SerpApi ne répond pas
+  const ligneCompteur = {
+    date_releve: jour, requetes_ce_lancement: etat.requetes,
+    requetes_ce_mois: valeurOuVide(compteApres.this_month_usage),
+    quota_mois: compteApres.searches_per_month || cfg.quota,
+    requetes_restantes: valeurOuVide(compteApres.plan_searches_left),
+  };
+
   // --- 3) Enregistrement (sauf en mode essai) ---
   if (opts.essai) {
+    ajouterLignes('compteur', [ligneCompteur]);
     journal.push('', '=== RÉSULTAT DE L\'ESSAI (rien n\'est enregistré) ===');
     prix.slice().sort((a, b) => a.prix_nuit_eur - b.prix_nuit_eur).forEach(l =>
       journal.push(l.site + ' : ' + l.prix_nuit_eur + ' €' + (l.offre ? ' (' + l.offre + ')' : '')));
@@ -423,15 +472,82 @@ function collecterSansVerrou(opts, journal) {
   ajouterLignes('prix', prix);
   ajouterLignes('avis', Object.keys(avis).map(h => avis[h]));
   ajouterLignes('hotels', fiches);
-  ajouterLignes('compteur', [{
-    date_releve: jour, requetes_ce_lancement: etat.requetes,
-    requetes_ce_mois: valeurOuVide(compteApres.this_month_usage),
-    quota_mois: compteApres.searches_per_month || cfg.quota,
-    requetes_restantes: valeurOuVide(compteApres.plan_searches_left),
-  }]);
+  ajouterLignes('compteur', [ligneCompteur]);
   return { ok: true, faite: true, journal: journal.join('\n'),
     message: 'Collecte enregistrée : ' + prix.length + ' prix, ' + Object.keys(avis).length + ' notes, '
       + fiches.length + ' fiches.' };
+}
+
+
+// =====================================================================
+//  Garde-fou du quota SerpApi (offre gratuite : 250 requêtes par mois, 50 par heure)
+// =====================================================================
+
+const PLAFOND_PAR_COLLECTE = 45; // SerpApi accepte 50 requêtes par heure : on reste en dessous
+
+/**
+ * Décide combien de requêtes cette collecte peut utiliser, pour ne jamais dépasser le quota :
+ * - requêtes restantes lues sur le compte SerpApi (gratuit) ; s'il ne répond pas, estimées
+ *   avec l'onglet Compteur (quota moins les requêtes notées ce mois-ci) ;
+ * - la « Réserve de requêtes » des Réglages n'est jamais entamée ;
+ * - si le rythme actuel ne tient pas jusqu'à la fin du mois, on réduit : d'abord les fiches
+ *   détaillées, puis le nombre de dates (celles du haut de la liste des Réglages passent en premier).
+ * Renvoie { sejours, fichesPour } ou { arret: 'message' }.
+ */
+function budgetCollecte(cfg, compte, sejours, fichesPour, essai, journal) {
+  const restantes = requetesRestantes(cfg, compte);
+  const disponible = restantes.valeur - cfg.marge;
+  const parDate = cfg.pages_max;
+  const projection = projectionMois(cfg, sejours.length);
+  journal.push('Budget : ' + restantes.valeur + ' requêtes restantes (' + restantes.source + '), réserve de '
+    + cfg.marge + ', besoin estimé d\'ici la fin du mois : ' + projection.total + '.');
+  if (disponible < parDate) {
+    return { arret: 'Quota SerpApi atteint (réserve de ' + cfg.marge + ' gardée) : pas de collecte avant le mois prochain.' };
+  }
+  let fiches = fichesPour, dates = sejours;
+  const tropPourAujourdhui = dates.length * parDate + fiches.length > Math.min(disponible, PLAFOND_PAR_COLLECTE);
+  if (fiches.length && (tropPourAujourdhui || (!essai && projection.total > disponible))) {
+    journal.push("! Économie de requêtes : pas de fiches détaillées aujourd'hui.");
+    fiches = [];
+  }
+  let garde = Math.min(dates.length, Math.floor(Math.min(disponible, PLAFOND_PAR_COLLECTE) / parDate));
+  if (!essai && projection.dates > disponible) {
+    // Le rythme quotidien ne tient pas : on répartit ce qui reste sur les collectes à venir
+    garde = Math.min(garde, Math.max(1, Math.floor(disponible / projection.collectes / parDate)));
+  }
+  if (garde < dates.length) {
+    journal.push('! Économie de requêtes : ' + garde + ' date(s) sur ' + dates.length + " aujourd'hui ("
+      + dates.slice(0, garde).map(d => d.nom).join(', ') + ').');
+    dates = dates.slice(0, garde);
+  }
+  return { sejours: dates, fichesPour: fiches };
+}
+
+/** Requêtes restantes ce mois-ci : { valeur, source }. */
+function requetesRestantes(cfg, compte) {
+  if (compte && typeof compte.plan_searches_left === 'number') {
+    return { valeur: compte.plan_searches_left, source: 'compte SerpApi' };
+  }
+  const mois = aujourdhui().slice(0, 7);
+  const utilisees = lireObjets('compteur').filter(l => String(l.date_releve).startsWith(mois))
+    .reduce((total, l) => total + (Number(l.requetes_ce_lancement) || 0), 0);
+  return { valeur: cfg.quota - utilisees, source: 'estimation avec l\'onglet Compteur, SerpApi ne répond pas' };
+}
+
+/** Requêtes nécessaires d'ici la fin du mois (aujourd'hui compris) avec les réglages actuels. */
+function projectionMois(cfg, nbDates) {
+  const [a, m, j] = aujourdhui().split('-').map(Number);
+  const joursDansLeMois = new Date(Date.UTC(a, m, 0)).getUTCDate();
+  const joursRestants = joursDansLeMois - j + 1;
+  const collectes = Math.ceil(joursRestants / Math.max(1, cfg.frequence_jours));
+  let joursFiches = 0;
+  for (let k = 0; k < joursRestants; k++) {
+    const jourSemaine = new Date(Date.UTC(a, m - 1, j + k)).getUTCDay(); // 0 = dimanche
+    if (JOURS[(jourSemaine + 6) % 7] === cfg.jour_fiches) joursFiches++;
+  }
+  const dates = collectes * nbDates * cfg.pages_max;
+  return { dates: dates, fiches: joursFiches * cfg.hotels.length, total: dates + joursFiches * cfg.hotels.length,
+    collectes: collectes, joursRestants: joursRestants };
 }
 
 
@@ -623,6 +739,11 @@ function notesDetaillees(fiche) {
   return morceaux.join(' ; ');
 }
 
+function photo(p) {
+  const image = (p.images || [])[0] || {};
+  return image.thumbnail || image.original_image || '';
+}
+
 function etoiles(p) {
   if (p.extracted_hotel_class) return p.extracted_hotel_class;
   const m = String(p.hotel_class || '').match(/\d/);
@@ -665,6 +786,7 @@ function lireReglages() {
     jour_fiches: String(parLibelle['Jour des fiches détaillées'] || 'lundi').toLowerCase().trim(),
     heure: nombre('Heure de la collecte automatique', 7),
     a_l_ouverture: String(parLibelle["Collecter à l'ouverture du classeur"] || 'oui').toLowerCase().trim().startsWith('o'),
+    tableau_a_l_ouverture: String(parLibelle["Ouvrir le tableau de bord à l'ouverture"] || 'oui').toLowerCase().trim().startsWith('o'),
     quota: nombre('Quota mensuel SerpApi', 250),
     marge: nombre('Réserve de requêtes', 15),
     pages_max: Math.max(1, nombre('Pages de résultats par date', 1)),

@@ -4,40 +4,38 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Veille hôtels Luchon</title>
-<meta name="description" content="Prix, notes et restauration des hôtels de Bagnères-de-Luchon, relevés chaque jour.">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
   /* ---------- Couleurs (clair / sombre) ---------- */
   :root {
     color-scheme: light;
-    --fond: #f4f3ef;
-    --carte: #fcfcfb;
-    --texte: #0b0b0b;
-    --texte-2: #52514e;
-    --texte-3: #75746f;
-    --trait: #e2e1dc;
-    --grille: #ecebe7;
-    --accent: #256abf;
-    --hausse: #b42b2b;
-    --baisse: #0a7a0a;
+    --fond: #f4f3ef; --carte: #fcfcfb; --carte-2: #f0efeb;
+    --texte: #0b0b0b; --texte-2: #52514e; --texte-3: #75746f;
+    --trait: #e2e1dc; --grille: #ecebe7;
+    --accent: #256abf; --accent-fond: #e6effa;
+    --hausse: #b42b2b; --baisse: #0a7a0a; --attention: #8a5a00;
     --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
     --s5: #e87ba4; --s6: #008300; --s7: #6250d6; --s8: #e34948;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       color-scheme: dark;
-      --fond: #121211; --carte: #1a1a19; --texte: #f0efec; --texte-2: #c3c2b7;
-      --texte-3: #94938b; --trait: #33332f; --grille: #2a2a27; --accent: #6da7ec;
-      --hausse: #f08080; --baisse: #5fd35f;
+      --fond: #121211; --carte: #1a1a19; --carte-2: #232321;
+      --texte: #f0efec; --texte-2: #c3c2b7; --texte-3: #94938b;
+      --trait: #33332f; --grille: #2a2a27;
+      --accent: #6da7ec; --accent-fond: #1c2a3d;
+      --hausse: #f08080; --baisse: #5fd35f; --attention: #e0b04a;
       --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
       --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
     }
   }
   :root[data-theme="dark"] {
     color-scheme: dark;
-    --fond: #121211; --carte: #1a1a19; --texte: #f0efec; --texte-2: #c3c2b7;
-    --texte-3: #94938b; --trait: #33332f; --grille: #2a2a27; --accent: #6da7ec;
-    --hausse: #f08080; --baisse: #5fd35f;
+    --fond: #121211; --carte: #1a1a19; --carte-2: #232321;
+    --texte: #f0efec; --texte-2: #c3c2b7; --texte-3: #94938b;
+    --trait: #33332f; --grille: #2a2a27;
+    --accent: #6da7ec; --accent-fond: #1c2a3d;
+    --hausse: #f08080; --baisse: #5fd35f; --attention: #e0b04a;
     --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
     --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
   }
@@ -47,262 +45,518 @@
     margin: 0; background: var(--fond); color: var(--texte);
     font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   }
-  main { max-width: 1100px; margin: 0 auto; padding: 20px 16px 48px; }
-  h1 { font-size: 1.5rem; margin: 0 0 4px; letter-spacing: -0.01em; }
-  h2 { font-size: 1.1rem; margin: 0 0 4px; }
-  .sous-titre { color: var(--texte-2); margin: 0; }
-  .carte {
-    background: var(--carte); border: 1px solid var(--trait); border-radius: 12px;
-    padding: 16px; margin-top: 16px;
-  }
+  .page { max-width: 1160px; margin: 0 auto; padding: 16px 16px 40px; }
+  h1 { font-size: 1.35rem; margin: 0; letter-spacing: -0.01em; }
+  h1 span { color: var(--texte-3); font-weight: 500; }
+  h2 { font-size: 1.05rem; margin: 0 0 4px; }
+  h3 { font-size: 1rem; margin: 0; }
+  a { color: var(--accent); }
+  .discret { color: var(--texte-3); font-size: 0.85rem; }
   .aide { color: var(--texte-3); font-size: 0.85rem; margin: 0 0 12px; }
+  [hidden] { display: none !important; }
 
-  /* En-tête : mise à jour + compteur */
-  .entete { display: flex; flex-wrap: wrap; gap: 12px; align-items: stretch; margin-top: 16px; }
-  .tuile {
-    flex: 1 1 220px; background: var(--carte); border: 1px solid var(--trait);
-    border-radius: 12px; padding: 12px 16px;
+  /* ---------- En-tête ---------- */
+  .barre { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+  .barre p { margin: 2px 0 0; color: var(--texte-2); font-size: 0.9rem; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .pastille {
+    display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px;
+    background: var(--carte); border: 1px solid var(--trait); font-size: 0.85rem; color: var(--texte-2);
   }
-  .tuile .etiquette { color: var(--texte-2); font-size: 0.85rem; }
-  .tuile .valeur { font-size: 1.35rem; font-weight: 650; font-variant-numeric: tabular-nums; }
-  .jauge { height: 6px; background: var(--grille); border-radius: 3px; margin-top: 8px; overflow: hidden; }
-  .jauge > div { height: 100%; background: var(--accent); border-radius: 3px; }
+  .pastille.ok { color: var(--baisse); }
+  .pastille.erreur { color: var(--hausse); }
+  .bouton {
+    font: inherit; font-size: 0.9rem; border: 1px solid var(--trait); background: var(--carte);
+    color: var(--texte); border-radius: 8px; padding: 7px 12px; min-height: 36px; cursor: pointer;
+  }
+  .bouton:hover { border-color: var(--accent); }
+  .bouton.principal { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .bouton[disabled] { opacity: 0.5; cursor: default; }
+  .tourne { display: inline-block; width: 0.85em; height: 0.85em; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: tourne 0.8s linear infinite; }
+  @keyframes tourne { to { transform: rotate(360deg); } }
 
-  /* Filtres */
-  .filtres { display: flex; flex-wrap: wrap; gap: 10px 14px; margin-bottom: 12px; }
-  .filtres label { display: flex; flex-direction: column; font-size: 0.8rem; color: var(--texte-2); gap: 3px; }
-  select, input[type="date"] {
-    font: inherit; font-size: 0.95rem; color: var(--texte); background: var(--fond);
+  /* ---------- Séjours et onglets ---------- */
+  .sejours { display: flex; gap: 8px; overflow-x: auto; padding: 14px 0 4px; scrollbar-width: none; }
+  .puce-sejour {
+    flex: none; font: inherit; text-align: left; cursor: pointer; border-radius: 10px; padding: 8px 12px;
+    border: 1px solid var(--trait); background: var(--carte); color: var(--texte);
+  }
+  .puce-sejour small { display: block; color: var(--texte-3); font-size: 0.8rem; }
+  .puce-sejour[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-fond); box-shadow: inset 0 0 0 1px var(--accent); }
+  .onglets { display: flex; gap: 4px; border-bottom: 1px solid var(--trait); margin: 10px 0 16px; overflow-x: auto; }
+  .onglet {
+    font: inherit; font-size: 0.95rem; background: none; border: 0; border-bottom: 2px solid transparent;
+    color: var(--texte-2); padding: 10px 12px; cursor: pointer; white-space: nowrap;
+  }
+  .onglet[aria-selected="true"] { color: var(--texte); border-bottom-color: var(--accent); font-weight: 600; }
+
+  /* ---------- Blocs ---------- */
+  .bloc { background: var(--carte); border: 1px solid var(--trait); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .kpi { background: var(--carte); border: 1px solid var(--trait); border-radius: 12px; padding: 12px 14px; }
+  .kpi .etiquette { color: var(--texte-2); font-size: 0.82rem; }
+  .kpi .valeur { font-size: 1.45rem; font-weight: 650; font-variant-numeric: tabular-nums; margin-top: 2px; }
+  .kpi .detail { color: var(--texte-3); font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .outils { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: end; margin-bottom: 12px; }
+  .outils label { display: flex; flex-direction: column; font-size: 0.8rem; color: var(--texte-2); gap: 3px; }
+  select, input[type="date"], input[type="text"] {
+    font: inherit; font-size: 0.92rem; color: var(--texte); background: var(--carte);
     border: 1px solid var(--trait); border-radius: 8px; padding: 6px 8px; min-height: 36px;
   }
   .bascule { display: inline-flex; border: 1px solid var(--trait); border-radius: 8px; overflow: hidden; }
-  .bascule button {
-    font: inherit; font-size: 0.9rem; border: 0; background: var(--fond); color: var(--texte-2);
-    padding: 6px 12px; min-height: 36px; cursor: pointer;
-  }
+  .bascule button { font: inherit; font-size: 0.88rem; border: 0; background: var(--carte); color: var(--texte-2); padding: 6px 12px; min-height: 34px; cursor: pointer; }
   .bascule button[aria-pressed="true"] { background: var(--accent); color: #fff; }
 
-  .zone-graphique { position: relative; height: 340px; }
-  @media (max-width: 600px) { .zone-graphique { height: 280px; } }
+  /* ---------- Cartes hôtels ---------- */
+  .cartes { display: grid; grid-template-columns: repeat(auto-fill, minmax(255px, 1fr)); gap: 14px; }
+  .carte-hotel { background: var(--carte); border: 1px solid var(--trait); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; }
+  .carte-hotel.sans-prix { opacity: 0.75; }
+  .photo { position: relative; height: 120px; background: var(--carte-2) center / cover no-repeat; }
+  .photo.sans-photo { height: 56px; background: color-mix(in srgb, var(--teinte) 18%, var(--carte)); }
+  .photo .initiales {
+    position: absolute; left: 14px; top: 50%; transform: translateY(-50%); width: 36px; height: 36px; border-radius: 50%;
+    display: grid; place-items: center; font-size: 0.9rem; font-weight: 700; color: #fff; background: var(--teinte);
+  }
+  .photo .comparer {
+    position: absolute; top: 8px; right: 8px; display: flex; align-items: center; gap: 5px; font-size: 0.78rem;
+    background: rgb(0 0 0 / 0.55); color: #fff; padding: 3px 8px; border-radius: 999px; cursor: pointer;
+  }
+  .photo .comparer input { margin: 0; accent-color: var(--accent); }
+  .corps { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+  .nom { display: flex; align-items: center; gap: 7px; }
+  .puce { flex: none; width: 10px; height: 10px; border-radius: 50%; }
+  .meta { font-size: 0.85rem; color: var(--texte-2); }
+  .etoiles { color: var(--attention); letter-spacing: 1px; }
+  .note { font-weight: 650; color: var(--texte); }
+  .ligne-prix { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
+  .montant { font-size: 1.6rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .par-nuit { color: var(--texte-3); font-size: 0.85rem; }
+  .tendance { font-size: 0.85rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .hausse { color: var(--hausse); } .baisse { color: var(--baisse); }
+  .site { font-size: 0.85rem; color: var(--texte-2); }
+  .spark { width: 100%; height: 38px; display: block; }
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: auto; padding-top: 4px; }
+  .tag { font-size: 0.76rem; padding: 2px 8px; border-radius: 999px; background: var(--carte-2); color: var(--texte-2); }
+  .tag.oui { background: var(--accent-fond); color: var(--texte); }
 
-  /* Tableau */
+  /* ---------- Graphique et tableau ---------- */
+  .zone-graphique { position: relative; height: 340px; }
+  @media (max-width: 600px) { .zone-graphique { height: 270px; } }
   .defile { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
   th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--trait); white-space: nowrap; }
   th { font-size: 0.8rem; color: var(--texte-2); font-weight: 600; cursor: pointer; user-select: none; }
   th.tri::after { content: " ▾"; } th.tri.asc::after { content: " ▴"; }
   td.num, th.num { text-align: right; }
-  td .pastille { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: 0; }
-  .hausse { color: var(--hausse); } .baisse { color: var(--baisse); }
-  .discret { color: var(--texte-3); font-size: 0.85em; }
-  input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); }
 
-  /* Comparateur */
-  .cartes-comparees { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
-  .fiche { border: 1px solid var(--trait); border-radius: 10px; padding: 12px; background: var(--fond); }
-  .fiche h3 { margin: 0 0 6px; font-size: 1rem; }
+  /* ---------- Comparateur ---------- */
+  .choix { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .choix button { font: inherit; font-size: 0.88rem; display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--trait); background: var(--carte); color: var(--texte-2); cursor: pointer; }
+  .choix button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-fond); color: var(--texte); }
+  .comparaison { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+  .fiche { border: 1px solid var(--trait); border-radius: 12px; padding: 12px; background: var(--carte); }
   .fiche dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; margin: 8px 0; font-size: 0.9rem; }
   .fiche dt { color: var(--texte-2); } .fiche dd { margin: 0; }
   .fiche ul { list-style: none; padding: 0; margin: 6px 0 0; font-size: 0.9rem; }
-  .fiche li { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; border-bottom: 1px dashed var(--trait); }
+  .fiche li { display: flex; justify-content: space-between; gap: 8px; padding: 4px 0; border-bottom: 1px dashed var(--trait); }
   .fiche li.moins-cher { font-weight: 650; }
-  .fiche a { color: var(--accent); }
-  .vide { color: var(--texte-2); padding: 16px 0; }
-  footer { color: var(--texte-3); font-size: 0.8rem; margin-top: 24px; }
 
-  /* Collecte à l'ouverture */
-  .tuile .petit { font-size: 0.95rem; font-weight: 500; margin-top: 2px; }
-  #statut-collecte.ok { color: var(--baisse); }
-  #statut-collecte.erreur { color: var(--hausse); }
-  #statut-collecte a { color: var(--accent); }
-  .boutons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-  .bouton {
-    font: inherit; font-size: 0.85rem; border: 1px solid var(--trait); background: var(--fond);
-    color: var(--texte); border-radius: 8px; padding: 5px 10px; min-height: 32px; cursor: pointer;
+  /* ---------- Pilotage ---------- */
+  .grille-pilotage { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+  .grille-pilotage .bloc { margin: 0; }
+  .boutons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .jauge { height: 8px; background: var(--grille); border-radius: 4px; margin: 8px 0 4px; overflow: hidden; }
+  .jauge > div { height: 100%; background: var(--accent); border-radius: 4px; }
+  .resultat { white-space: pre-wrap; font: 0.8rem/1.45 ui-monospace, Menlo, Consolas, monospace; background: var(--carte-2); border-radius: 8px; padding: 10px; margin-top: 10px; max-height: 260px; overflow: auto; }
+  .journal details { border-bottom: 1px solid var(--trait); padding: 8px 0; }
+  .journal summary { cursor: pointer; font-size: 0.9rem; }
+  .journal summary span { color: var(--texte-3); margin-right: 6px; font-variant-numeric: tabular-nums; }
+  .liste { margin: 6px 0 0; padding-left: 18px; font-size: 0.9rem; }
+  .budget { font-size: 0.88rem; border-radius: 8px; padding: 10px 12px; margin: 0; background: var(--carte-2); color: var(--texte-2); }
+  .budget strong { color: var(--texte); }
+  .budget.ok strong { color: var(--baisse); }
+  .budget.attention strong { color: var(--attention); }
+  .vide { color: var(--texte-2); padding: 24px 0; text-align: center; }
+  #toast {
+    position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); background: var(--texte); color: var(--fond);
+    padding: 9px 14px; border-radius: 10px; font-size: 0.9rem; max-width: calc(100vw - 32px); opacity: 0; transition: opacity 0.2s; pointer-events: none;
   }
-  .bouton.principal { background: var(--accent); border-color: var(--accent); color: #fff; }
-  .bouton[disabled] { opacity: 0.5; cursor: default; }
-  .tourne { display: inline-block; width: 0.8em; height: 0.8em; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: tourne 0.8s linear infinite; vertical-align: -1px; margin-right: 4px; }
-  @keyframes tourne { to { transform: rotate(360deg); } }
-  .tuile a { color: var(--accent); font-size: 0.85rem; }
+  #toast.visible { opacity: 1; }
 </style>
 </head>
 <body>
-<main>
-  <h1>Veille hôtels — Bagnères-de-Luchon</h1>
-  <p class="sous-titre">Prix par nuit (2 adultes) relevés chaque jour sur Google Hotels.</p>
+<div class="page">
+  <header class="barre">
+    <div>
+      <h1>Veille hôtels <span>· Bagnères-de-Luchon</span></h1>
+      <p id="sous-titre">Chargement…</p>
+    </div>
+    <div class="actions">
+      <span class="pastille" id="pastille" aria-live="polite">…</span>
+      <button type="button" class="bouton principal" id="b-collecte">Relancer la collecte</button>
+    </div>
+  </header>
 
-  <div class="entete">
-    <div class="tuile">
-      <div class="etiquette">Dernière mise à jour</div>
-      <div class="valeur" id="maj">—</div>
+  <nav class="sejours" id="sejours" aria-label="Séjour suivi"></nav>
+
+  <nav class="onglets" role="tablist">
+    <button class="onglet" role="tab" data-vue="apercu" aria-selected="true">Aperçu</button>
+    <button class="onglet" role="tab" data-vue="evolution" aria-selected="false">Évolution</button>
+    <button class="onglet" role="tab" data-vue="comparer" aria-selected="false">Comparer</button>
+    <button class="onglet" role="tab" data-vue="pilotage" aria-selected="false">Pilotage</button>
+  </nav>
+
+  <!-- ===== Aperçu ===== -->
+  <section id="v-apercu">
+    <div class="kpis" id="kpis"></div>
+    <div class="outils">
+      <label>Trier par
+        <select id="tri-cartes">
+          <option value="prix">Prix le plus bas</option>
+          <option value="note">Meilleure note</option>
+          <option value="tendance">Plus forte baisse</option>
+          <option value="nom">Nom</option>
+        </select>
+      </label>
+      <span class="discret" id="info-cartes"></span>
     </div>
-    <div class="tuile">
-      <div class="etiquette">Requêtes SerpApi utilisées ce mois-ci</div>
-      <div class="valeur" id="quota">—</div>
-      <div class="jauge"><div id="quota-jauge" style="width:0"></div></div>
+    <div class="cartes" id="cartes"></div>
+  </section>
+
+  <!-- ===== Évolution ===== -->
+  <section id="v-evolution" hidden>
+    <div class="bloc">
+      <div class="outils">
+        <label>Du <input type="date" id="f-debut"></label>
+        <label>Au <input type="date" id="f-fin"></label>
+        <label>Site <select id="f-site"></select></label>
+        <label>Courbes par
+          <span class="bascule" role="group">
+            <button type="button" id="b-hotel" aria-pressed="true">Hôtel</button>
+            <button type="button" id="b-cat" aria-pressed="false">Catégorie</button>
+          </span>
+        </label>
+      </div>
+      <h2>Évolution du prix le plus bas</h2>
+      <p class="aide">Chaque point = le prix le plus bas relevé ce jour-là pour le séjour choisi. Touchez la courbe pour voir les valeurs ; cliquez un nom dans la légende pour le masquer.</p>
+      <div class="zone-graphique"><canvas id="graphique" aria-label="Évolution des prix"></canvas></div>
+      <p class="vide" id="graphique-vide" hidden></p>
     </div>
-    <div class="tuile">
-      <div class="etiquette">Collecte</div>
-      <div class="petit" id="statut-collecte" aria-live="polite">Chargement…</div>
-      <div class="boutons">
-        <button type="button" class="bouton" id="b-relancer" hidden>Relancer maintenant</button>
-        <a id="lien-classeur" target="_blank" rel="noopener" hidden>Ouvrir la base de données</a>
+    <div class="bloc">
+      <h2>Tableau comparatif</h2>
+      <p class="aide">Sur la période et le séjour choisis. Cliquez un titre de colonne pour trier.</p>
+      <div class="defile"><table id="tableau"></table></div>
+    </div>
+  </section>
+
+  <!-- ===== Comparer ===== -->
+  <section id="v-comparer" hidden>
+    <p class="aide">Choisissez 2 hôtels ou plus : derniers prix relevés pour le séjour choisi, site par site.</p>
+    <div class="choix" id="choix"></div>
+    <div class="comparaison" id="comparaison"></div>
+  </section>
+
+  <!-- ===== Pilotage ===== -->
+  <section id="v-pilotage" hidden>
+    <div class="grille-pilotage">
+      <div class="bloc">
+        <h2>Collecte</h2>
+        <p class="discret" id="p-derniere"></p>
+        <p class="discret" id="p-maj"></p>
+        <div class="boutons">
+          <button type="button" class="bouton principal" data-action="collecte">Lancer la collecte <small>(≈ 4 requêtes)</small></button>
+          <button type="button" class="bouton" data-action="fiches">Collecte + fiches détaillées <small>(≈ 12)</small></button>
+        </div>
+        <div class="boutons">
+          <select id="essai-hotel" aria-label="Hôtel à tester"></select>
+          <button type="button" class="bouton" data-action="essai">Essai <small>(2 requêtes, n'enregistre rien)</small></button>
+        </div>
+        <div class="resultat" id="p-resultat" hidden></div>
+      </div>
+      <div class="bloc">
+        <h2>Compteur SerpApi</h2>
+        <div class="kpi" style="border:0;padding:0">
+          <div class="valeur" id="p-quota">—</div>
+          <div class="jauge"><div id="p-jauge" style="width:0"></div></div>
+          <div class="detail" id="p-quota-detail"></div>
+        </div>
+        <p class="aide" id="p-estimation" style="margin-top:10px"></p>
+        <p class="budget" id="p-budget"></p>
+      </div>
+      <div class="bloc">
+        <h2>Réglages</h2>
+        <p class="discret" id="p-automatisme"></p>
+        <strong style="font-size:.9rem">Hôtels suivis</strong>
+        <ul class="liste" id="p-hotels"></ul>
+        <strong style="font-size:.9rem;display:block;margin-top:10px">Dates de séjour</strong>
+        <ul class="liste" id="p-dates"></ul>
+        <div class="boutons"><a class="bouton" id="lien-reglages" target="_blank" rel="noopener">Modifier les réglages</a>
+          <a class="bouton" id="lien-classeur" target="_blank" rel="noopener">Ouvrir le classeur</a></div>
+      </div>
+      <div class="bloc journal">
+        <h2>Journal des collectes</h2>
+        <div id="p-journal"></div>
       </div>
     </div>
-  </div>
-
-  <section class="carte" id="vide" hidden>
-    <h2>Pas encore de données</h2>
-    <p class="aide" style="margin:0">Aucune collecte n'a encore été enregistrée. Dans le classeur :
-      menu <em>Veille hôtels</em> → <em>Enregistrer la clé SerpApi</em>, puis <em>Lancer la collecte maintenant</em>.</p>
   </section>
 
-  <section class="carte">
-    <div class="filtres">
-      <label>Séjour suivi <select id="f-sejour"></select></label>
-      <label>Du <input type="date" id="f-debut"></label>
-      <label>Au <input type="date" id="f-fin"></label>
-      <label>Site <select id="f-site"></select></label>
-      <label>Courbes par
-        <span class="bascule" role="group">
-          <button type="button" id="b-hotel" aria-pressed="true">Hôtel</button>
-          <button type="button" id="b-cat" aria-pressed="false">Catégorie</button>
-        </span>
-      </label>
-    </div>
-    <h2>Évolution du prix le plus bas</h2>
-    <p class="aide">Chaque point = le prix le plus bas trouvé ce jour-là pour la date de séjour choisie. Touchez la courbe pour voir les valeurs. Cliquez un nom dans la légende pour le masquer.</p>
-    <div class="zone-graphique"><canvas id="graphique" aria-label="Évolution des prix par hôtel"></canvas></div>
-    <div id="graphique-vide" class="vide" hidden></div>
+  <section id="vide" class="bloc" hidden>
+    <h2>Pas encore de prix</h2>
+    <p class="aide" style="margin:0">Aucune collecte n'a encore enregistré de prix. Cliquez « Relancer la collecte » en haut à droite :
+      les cartes des hôtels apparaîtront dans une minute environ.</p>
   </section>
-
-  <section class="carte">
-    <h2>Tableau comparatif</h2>
-    <p class="aide">Sur la période et le séjour choisis ci-dessus. Cliquez un titre de colonne pour trier. Cochez au moins 2 hôtels pour les comparer plus bas.</p>
-    <div class="defile"><table id="tableau"></table></div>
-  </section>
-
-  <section class="carte" id="comparateur">
-    <h2>Comparateur</h2>
-    <p class="aide">Derniers prix relevés pour le séjour choisi, site par site.</p>
-    <div id="cartes" class="cartes-comparees"></div>
-  </section>
-
-  <footer>Données : Google Hotels via SerpApi, enregistrées dans le classeur Google Sheets. Note sur 10 = note Google sur 5 × 2. « non indiqué » = Google ne donne pas l'information.</footer>
-</main>
+</div>
+<div id="toast" role="status"></div>
 
 <script>
 // =====================================================================
-//  Lecture des fichiers CSV du dossier data/ et affichage
+//  Tableau de bord de la veille hôtels.
+//  Les données viennent du script du classeur (Code.gs) via google.script.run.
 // =====================================================================
-const etat = { prix: [], avis: [], hotels: [], usage: [], mode: "hotel", coches: new Set(), tri: { col: "dernier", asc: true } };
+const etat = {
+  prix: [], avis: [], hotels: [], usage: [], reglages: { hotels: [], dates: [] }, journal: [], infos: {},
+  sejour: null, vue: "apercu", modeCourbes: "hotel", choisis: new Set(), tri: { col: "dernier", asc: true },
+};
 const $ = (id) => document.getElementById(id);
-const euros = (v) => v == null || isNaN(v) ? "—" : v.toLocaleString("fr-FR", { maximumFractionDigits: 0 }) + " €";
-const dateFr = (iso) => iso ? new Date(iso + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) : "—";
-const dateCourte = (iso) => new Date(iso + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+const nombre = (v) => (v === "" || v == null ? NaN : parseFloat(String(v).replace(",", ".")));
+const euros = (v) => (v == null || isNaN(v) ? "—" : Math.round(v).toLocaleString("fr-FR") + " €");
+const dateLongue = (iso) => (iso ? new Date(iso + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) : "—");
+const dateCourte = (iso) => (iso ? new Date(iso + "T12:00:00").toLocaleDateString("fr-FR", { day: "numeric", month: "short" }) : "");
 const echapper = (t) => String(t ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const pourcent = (v) => (v > 0 ? "▲ +" : v < 0 ? "▼ " : "") + Math.abs(v).toFixed(1).replace(".", ",") + " %";
 
-// Appelle une fonction du script du classeur (Code.gs) et renvoie une promesse
+// Appelle une fonction du script du classeur et renvoie une promesse
 function serveur(fonction, ...args) {
-  return new Promise((ok, ko) =>
-    google.script.run.withSuccessHandler(ok).withFailureHandler(ko)[fonction](...args));
+  return new Promise((ok, ko) => google.script.run.withSuccessHandler(ok).withFailureHandler(ko)[fonction](...args));
 }
 
-// Couleur fixe par hôtel (dans l'ordre de première apparition) : elle ne change jamais avec les filtres
-function couleur(i) {
-  return getComputedStyle(document.documentElement).getPropertyValue("--s" + ((i % 8) + 1)).trim();
+function toast(texte) {
+  const t = $("toast");
+  t.textContent = texte;
+  t.classList.add("visible");
+  clearTimeout(toast.minuteur);
+  toast.minuteur = setTimeout(() => t.classList.remove("visible"), 4000);
 }
 
-// Dernière fiche connue de chaque hôtel
-function fiches() {
-  const f = {};
-  etat.hotels.forEach((l) => (f[l.hotel] = l));
-  return f;
+// ------------------------- Préparation des données -------------------------
+// Couleur fixe par hôtel (ordre des Réglages) : elle ne change jamais avec les filtres
+function couleur(hotel) {
+  const i = etat.ordreHotels.indexOf(hotel);
+  return getComputedStyle(document.documentElement).getPropertyValue("--s" + ((Math.max(i, 0) % 8) + 1)).trim();
+}
+function derniereLigne(liste, hotel) {
+  let r = null;
+  liste.forEach((l) => { if (l.hotel === hotel) r = l; });
+  return r;
 }
 function categorie(hotel) {
-  const e = (fiches()[hotel] || {}).categorie_etoiles;
+  const e = (etat.infos[hotel] || {}).categorie_etoiles;
   return e ? e + " étoile" + (e > 1 ? "s" : "") : "Non classé";
 }
-function dernierAvis(hotel) {
-  let a = null;
-  etat.avis.forEach((l) => { if (l.hotel === hotel) a = l; });
-  return a;
-}
 
-// Lignes de prix filtrées selon les réglages de la page
-function prixFiltres() {
-  const sejour = $("f-sejour").value, debut = $("f-debut").value, fin = $("f-fin").value, site = $("f-site").value;
-  return etat.prix.filter((l) => l.sejour === sejour && (!debut || l.date_releve >= debut)
-    && (!fin || l.date_releve <= fin) && (!site || l.site === site));
-}
-
-// Pour chaque hôtel et chaque jour de relevé : prix le plus bas (et le site)
-function minimaParJour(lignes) {
-  const m = {};
-  lignes.forEach((l) => {
-    const p = parseFloat(l.prix_nuit_eur);
+// Pour un séjour : prix le plus bas de chaque hôtel, jour par jour
+function seriesSejour(sejour, filtre = {}) {
+  const parHotel = {};
+  etat.prix.forEach((l) => {
+    if (l.sejour !== sejour) return;
+    if (filtre.debut && l.date_releve < filtre.debut) return;
+    if (filtre.fin && l.date_releve > filtre.fin) return;
+    if (filtre.site && l.site !== filtre.site) return;
+    const p = nombre(l.prix_nuit_eur);
     if (isNaN(p)) return;
-    const cle = l.hotel + "|" + l.date_releve;
-    if (!m[cle] || p < m[cle].prix) m[cle] = { hotel: l.hotel, jour: l.date_releve, prix: p, site: l.site };
+    const jours = (parHotel[l.hotel] = parHotel[l.hotel] || {});
+    if (!jours[l.date_releve] || p < jours[l.date_releve].prix) jours[l.date_releve] = { prix: p, site: l.site, lien: l.lien, offre: l.offre };
   });
-  return Object.values(m);
+  const resume = {};
+  Object.keys(parHotel).forEach((h) => {
+    const jours = Object.keys(parHotel[h]).sort();
+    const points = jours.map((j) => ({ jour: j, ...parHotel[h][j] }));
+    const dernier = points[points.length - 1], premier = points[0];
+    const plusBas = points.reduce((a, b) => (b.prix < a.prix ? b : a));
+    resume[h] = {
+      points, dernier, premier, plusBas,
+      evolution: points.length > 1 ? (100 * (dernier.prix - premier.prix)) / premier.prix : null,
+    };
+  });
+  return resume;
 }
 
-// ------------------------- Graphique -------------------------
+function noteSur10(hotel) {
+  const a = derniereLigne(etat.avis, hotel);
+  return a ? { note: nombre(a.note_sur_10), avis: parseInt(a.nombre_avis, 10), detail: a.notes_detaillees } : null;
+}
+
+// ------------------------- Séjours -------------------------
+function listeSejours() {
+  const vus = new Map();
+  etat.reglages.dates.forEach((d) => vus.set(d.nom, d.arrivee));
+  etat.prix.forEach((l) => { if (!vus.has(l.sejour)) vus.set(l.sejour, l.date_sejour); });
+  return [...vus.entries()].map(([nom, arrivee]) => ({ nom, arrivee }));
+}
+
+function dessinerSejours() {
+  const sejours = listeSejours();
+  if (!sejours.some((s) => s.nom === etat.sejour)) etat.sejour = sejours.length ? sejours[0].nom : null;
+  $("sejours").innerHTML = sejours.map((s) => {
+    const n = Object.keys(seriesSejour(s.nom)).length;
+    return `<button type="button" class="puce-sejour" data-sejour="${echapper(s.nom)}" aria-pressed="${s.nom === etat.sejour}">
+      ${echapper(s.nom)}<small>${s.nom.startsWith("Dans") ? "date glissante" : "arrivée " + dateCourte(s.arrivee)} · ${n} hôtel${n > 1 ? "s" : ""}</small></button>`;
+  }).join("");
+}
+$("sejours").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-sejour]");
+  if (!b) return;
+  etat.sejour = b.dataset.sejour;
+  toutDessiner();
+});
+
+// ------------------------- Aperçu -------------------------
+function sparkline(points, teinte) {
+  if (points.length < 2) return `<p class="discret" style="margin:0">Un seul relevé pour l'instant</p>`;
+  const derniers = points.slice(-30), l = 240, h = 38, m = 4;
+  const prix = derniers.map((p) => p.prix), min = Math.min(...prix), max = Math.max(...prix);
+  const x = (i) => m + (i * (l - 2 * m)) / (derniers.length - 1);
+  const y = (p) => (max === min ? h / 2 : h - m - ((p - min) * (h - 2 * m)) / (max - min));
+  const d = derniers.map((p, i) => (i ? "L" : "M") + x(i).toFixed(1) + " " + y(p.prix).toFixed(1)).join(" ");
+  const fin = derniers.length - 1;
+  return `<svg class="spark" viewBox="0 0 ${l} ${h}" preserveAspectRatio="none" role="img" aria-label="Évolution sur ${derniers.length} relevés, de ${euros(prix[0])} à ${euros(prix[fin])}">
+    <path d="${d}" fill="none" stroke="${teinte}" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>
+    <circle cx="${x(fin)}" cy="${y(prix[fin])}" r="3.5" fill="${teinte}"/></svg>`;
+}
+
+function dessinerApercu() {
+  const series = seriesSejour(etat.sejour);
+  const hotels = etat.ordreHotels;
+  const avecPrix = hotels.filter((h) => series[h]);
+
+  // Indicateurs
+  const derniers = avecPrix.map((h) => ({ h, ...series[h].dernier }));
+  const moinsCher = derniers.reduce((a, b) => (!a || b.prix < a.prix ? b : a), null);
+  const tries = derniers.map((d) => d.prix).sort((a, b) => a - b);
+  const mediane = tries.length ? (tries.length % 2 ? tries[(tries.length - 1) / 2] : (tries[tries.length / 2 - 1] + tries[tries.length / 2]) / 2) : null;
+  const notes = hotels.map((h) => ({ h, ...(noteSur10(h) || {}) })).filter((n) => !isNaN(n.note));
+  const mieuxNote = notes.reduce((a, b) => (!a || b.note > a.note ? b : a), null);
+  $("kpis").innerHTML = `
+    <div class="kpi"><div class="etiquette">Le moins cher</div><div class="valeur">${moinsCher ? euros(moinsCher.prix) : "—"}</div>
+      <div class="detail">${moinsCher ? echapper(moinsCher.h) + " · " + echapper(moinsCher.site) : "aucun prix"}</div></div>
+    <div class="kpi"><div class="etiquette">Prix médian</div><div class="valeur">${euros(mediane)}</div>
+      <div class="detail">la moitié des hôtels sont moins chers</div></div>
+    <div class="kpi"><div class="etiquette">Le mieux noté</div><div class="valeur">${mieuxNote ? mieuxNote.note.toFixed(1).replace(".", ",") + " /10" : "—"}</div>
+      <div class="detail">${mieuxNote ? echapper(mieuxNote.h) + (isNaN(mieuxNote.avis) ? "" : " · " + mieuxNote.avis.toLocaleString("fr-FR") + " avis") : "aucune note"}</div></div>
+    <div class="kpi"><div class="etiquette">Hôtels avec un prix</div><div class="valeur">${avecPrix.length} / ${hotels.length}</div>
+      <div class="detail">${hotels.length - avecPrix.length ? hotels.length - avecPrix.length + " sans prix (complet, fermé ?)" : "tous les hôtels suivis"}</div></div>`;
+
+  // Cartes
+  const triCartes = $("tri-cartes").value;
+  const cle = (h) => {
+    const s = series[h], n = noteSur10(h);
+    if (triCartes === "note") return n && !isNaN(n.note) ? -n.note : 99;
+    if (triCartes === "tendance") return s && s.evolution != null ? s.evolution : 999;
+    if (triCartes === "nom") return 0;
+    return s ? s.dernier.prix : Infinity;
+  };
+  const ordre = hotels.slice().sort((a, b) => cle(a) - cle(b) || a.localeCompare(b, "fr"));
+  $("info-cartes").textContent = `Prix pour 1 nuit, 2 adultes, au dernier relevé${derniers.length ? " (" + dateCourte(derniers.map((d) => d.jour).sort().pop()) + ")" : ""}.`;
+  $("cartes").innerHTML = ordre.map((h) => {
+    const s = series[h], info = etat.infos[h] || {}, n = noteSur10(h), teinte = couleur(h);
+    const etoiles = info.categorie_etoiles ? "★".repeat(Number(info.categorie_etoiles)) : "";
+    const initiales = h.replace(/^(hôtel|hotel|le|la|résidence)\s+(&\s*spa\s+|des\s+|d['’]\s*)?/i, "").split(/\s+/).map((m) => m[0]).join("").slice(0, 2).toUpperCase();
+    const photo = info.photo
+      ? `<div class="photo" style="background-image:url('${echapper(info.photo)}')">`
+      : `<div class="photo sans-photo" style="--teinte:${teinte}"><span class="initiales">${echapper(initiales)}</span>`;
+    const resto = info.restaurant_sur_place, pdj = info.petit_dejeuner_propose;
+    const tags = [
+      resto ? `<span class="tag ${resto === "oui" ? "oui" : ""}">Restaurant : ${echapper(resto)}</span>` : "",
+      pdj ? `<span class="tag ${String(pdj).startsWith("oui") ? "oui" : ""}">Petit-déj. : ${echapper(pdj)}</span>` : "",
+    ].join("");
+    const prix = s
+      ? `<div class="ligne-prix"><span class="montant">${euros(s.dernier.prix)}</span><span class="par-nuit">/ nuit</span>
+          ${s.evolution != null ? `<span class="tendance ${s.evolution > 0.5 ? "hausse" : s.evolution < -0.5 ? "baisse" : ""}">${pourcent(s.evolution)}</span>` : ""}</div>
+         <div class="site">sur ${echapper(s.dernier.site)}${s.dernier.lien ? ` · <a href="${echapper(s.dernier.lien)}" target="_blank" rel="noopener">voir l'offre</a>` : ""}
+           ${s.plusBas.prix < s.dernier.prix ? `<br><span class="discret">plus bas vu : ${euros(s.plusBas.prix)} le ${dateCourte(s.plusBas.jour)}</span>` : ""}</div>
+         ${sparkline(s.points, teinte)}`
+      : `<div class="ligne-prix"><span class="discret">Pas de prix pour ce séjour</span></div>
+         <div class="site discret">complet, fermé ou non trouvé sur Google Hotels</div>`;
+    return `<article class="carte-hotel ${s ? "" : "sans-prix"}">
+      ${photo}<label class="comparer"><input type="checkbox" data-comparer="${echapper(h)}" ${etat.choisis.has(h) ? "checked" : ""}> Comparer</label></div>
+      <div class="corps">
+        <div class="nom"><span class="puce" style="background:${teinte}"></span><h3>${echapper(h)}</h3></div>
+        <div class="meta">${etoiles ? `<span class="etoiles" aria-label="${info.categorie_etoiles} étoiles">${etoiles}</span> · ` : ""}${n && !isNaN(n.note) ? `<span class="note">${n.note.toFixed(1).replace(".", ",")}</span>/10${isNaN(n.avis) ? "" : " · " + n.avis.toLocaleString("fr-FR") + " avis"}` : "pas encore de note"}</div>
+        ${prix}
+        <div class="tags">${tags}</div>
+      </div></article>`;
+  }).join("");
+}
+$("tri-cartes").addEventListener("change", dessinerApercu);
+$("cartes").addEventListener("change", (e) => {
+  const h = e.target.dataset.comparer;
+  if (!h) return;
+  e.target.checked ? etat.choisis.add(h) : etat.choisis.delete(h);
+  toast(etat.choisis.size >= 2 ? `${etat.choisis.size} hôtels à comparer : onglet « Comparer »` : "Cochez au moins 2 hôtels pour les comparer");
+});
+
+// ------------------------- Évolution -------------------------
 let graphique = null;
+function filtresEvolution() { return { debut: $("f-debut").value, fin: $("f-fin").value, site: $("f-site").value }; }
+
+function remplirFiltresEvolution() {
+  const sites = [...new Set(etat.prix.map((l) => l.site))].sort((a, b) => a.localeCompare(b, "fr"));
+  const choisi = $("f-site").value;
+  $("f-site").innerHTML = `<option value="">Tous (le moins cher)</option>` + sites.map((s) => `<option>${echapper(s)}</option>`).join("");
+  if (sites.includes(choisi)) $("f-site").value = choisi;
+  const jours = etat.prix.map((l) => l.date_releve).sort();
+  if (!jours.length) return;
+  $("f-debut").min = $("f-fin").min = jours[0];
+  $("f-debut").max = $("f-fin").max = jours[jours.length - 1];
+  if (!$("f-debut").value) $("f-debut").value = jours[0];
+  $("f-fin").value = jours[jours.length - 1];
+}
+
 function dessinerGraphique() {
-  const minima = minimaParJour(prixFiltres());
-  const jours = [...new Set(minima.map((m) => m.jour))].sort();
-  const vide = $("graphique-vide");
+  const series = seriesSejour(etat.sejour, filtresEvolution());
+  const jours = [...new Set(Object.values(series).flatMap((s) => s.points.map((p) => p.jour)))].sort();
   if (!jours.length) {
     if (graphique) { graphique.destroy(); graphique = null; }
-    vide.hidden = false; vide.textContent = "Aucun prix pour ces réglages.";
+    $("graphique-vide").hidden = false;
+    $("graphique-vide").textContent = "Aucun prix pour ces réglages.";
     return;
   }
-  vide.hidden = true;
-
-  let series;
-  if (etat.mode === "hotel") {
-    series = etat.ordreHotels.filter((h) => minima.some((m) => m.hotel === h)).map((h) => ({
-      nom: h, idx: etat.ordreHotels.indexOf(h),
-      valeurs: jours.map((j) => (minima.find((m) => m.hotel === h && m.jour === j) || {}).prix ?? null),
+  $("graphique-vide").hidden = true;
+  let courbes;
+  if (etat.modeCourbes === "hotel") {
+    courbes = etat.ordreHotels.filter((h) => series[h]).map((h) => ({
+      nom: h, teinte: couleur(h), pointilles: etat.ordreHotels.indexOf(h) >= 8,
+      valeurs: jours.map((j) => (series[h].points.find((p) => p.jour === j) || {}).prix ?? null),
     }));
   } else {
     const cats = [...new Set(etat.ordreHotels.map(categorie))].sort();
-    series = cats.map((c, i) => ({
-      nom: c + " (moyenne)", idx: i,
+    const css = getComputedStyle(document.documentElement);
+    courbes = cats.map((c, i) => ({
+      nom: c + " (moyenne)", teinte: css.getPropertyValue("--s" + ((i % 8) + 1)).trim(), pointilles: false,
       valeurs: jours.map((j) => {
-        const p = minima.filter((m) => m.jour === j && categorie(m.hotel) === c).map((m) => m.prix);
+        const p = Object.keys(series).filter((h) => categorie(h) === c).map((h) => (series[h].points.find((x) => x.jour === j) || {}).prix).filter((v) => v != null);
         return p.length ? Math.round(p.reduce((a, b) => a + b, 0) / p.length) : null;
       }),
-    })).filter((s) => s.valeurs.some((v) => v != null));
+    })).filter((c) => c.valeurs.some((v) => v != null));
   }
-
   const css = getComputedStyle(document.documentElement);
-  const texte2 = css.getPropertyValue("--texte-2").trim(), grille = css.getPropertyValue("--grille").trim();
-  const carte = css.getPropertyValue("--carte").trim();
+  const texte2 = css.getPropertyValue("--texte-2").trim(), grille = css.getPropertyValue("--grille").trim(), carte = css.getPropertyValue("--carte").trim();
   if (graphique) graphique.destroy();
   graphique = new Chart($("graphique"), {
     type: "line",
     data: {
       labels: jours.map(dateCourte),
-      datasets: series.map((s) => ({
-        label: s.nom, data: s.valeurs, borderColor: couleur(s.idx), backgroundColor: couleur(s.idx),
-        borderWidth: 2, pointRadius: jours.length > 40 ? 0 : 3, pointHoverRadius: 5,
-        pointBorderColor: carte, pointBorderWidth: 2, spanGaps: true, tension: 0.2,
-        borderDash: s.idx >= 8 ? [6, 4] : [],  // au-delà de 8 hôtels : pointillés
+      datasets: courbes.map((c) => ({
+        label: c.nom, data: c.valeurs, borderColor: c.teinte, backgroundColor: c.teinte, borderWidth: 2,
+        pointRadius: jours.length > 40 ? 0 : 3, pointHoverRadius: 5, pointBorderColor: carte, pointBorderWidth: 2,
+        spanGaps: true, tension: 0.2, borderDash: c.pointilles ? [6, 4] : [],
       })),
     },
     options: {
-      responsive: true, maintainAspectRatio: false,
-      interaction: { mode: "index", intersect: false },
+      responsive: true, maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
       plugins: {
         legend: { position: "bottom", labels: { color: texte2, usePointStyle: true, pointStyle: "circle", boxWidth: 8, boxHeight: 8, padding: 14 } },
-        tooltip: {
-          itemSort: (a, b) => a.parsed.y - b.parsed.y,
-          callbacks: { label: (c) => " " + c.dataset.label + " : " + euros(c.parsed.y) },
-        },
+        tooltip: { itemSort: (a, b) => a.parsed.y - b.parsed.y, callbacks: { label: (c) => " " + c.dataset.label + " : " + euros(c.parsed.y) } },
       },
       scales: {
         x: { grid: { display: false }, ticks: { color: texte2, maxRotation: 0, autoSkipPadding: 12 } },
@@ -312,43 +566,24 @@ function dessinerGraphique() {
   });
 }
 
-// ------------------------- Tableau -------------------------
-function lignesTableau() {
-  const filtres = prixFiltres();
-  const minima = minimaParJour(filtres);
-  const f = fiches();
-  return etat.ordreHotels.map((h, idx) => {
-    const m = minima.filter((x) => x.hotel === h).sort((a, b) => a.jour.localeCompare(b.jour));
-    const plusBas = m.length ? m.reduce((a, b) => (b.prix < a.prix ? b : a)) : null;
-    const premier = m[0], dernier = m[m.length - 1];
-    const a = dernierAvis(h), fi = f[h] || {};
+const COLONNES = [
+  { cle: "hotel", titre: "Hôtel" }, { cle: "categorie", titre: "Catégorie" },
+  { cle: "plusBas", titre: "Prix le plus bas", num: true }, { cle: "site", titre: "Site le moins cher" },
+  { cle: "dernier", titre: "Dernier prix", num: true }, { cle: "evolution", titre: "Évolution", num: true },
+  { cle: "note", titre: "Note /10", num: true }, { cle: "avis", titre: "Nb d'avis", num: true },
+  { cle: "resto", titre: "Restaurant" }, { cle: "pdj", titre: "Petit-déjeuner" },
+];
+function dessinerTableau() {
+  const series = seriesSejour(etat.sejour, filtresEvolution());
+  const lignes = etat.ordreHotels.map((h) => {
+    const s = series[h], n = noteSur10(h) || {}, info = etat.infos[h] || {};
     return {
-      hotel: h, idx, categorie: categorie(h),
-      plusBas: plusBas?.prix ?? null, plusBasJour: plusBas?.jour,
-      site: dernier?.site ?? "", dernier: dernier?.prix ?? null,
-      evolution: premier && dernier && premier.jour !== dernier.jour ? (100 * (dernier.prix - premier.prix)) / premier.prix : null,
-      note: a ? parseFloat(a.note_sur_10) : null, avis: a ? parseInt(a.nombre_avis) : null,
-      resto: fi.restaurant_sur_place || "non indiqué", pdj: fi.petit_dejeuner_propose || "non indiqué",
+      hotel: h, categorie: categorie(h), plusBas: s ? s.plusBas.prix : null, plusBasJour: s && s.plusBas.jour,
+      site: s ? s.dernier.site : "", dernier: s ? s.dernier.prix : null, evolution: s ? s.evolution : null,
+      note: isNaN(n.note) ? null : n.note, avis: isNaN(n.avis) ? null : n.avis,
+      resto: info.restaurant_sur_place || "non indiqué", pdj: info.petit_dejeuner_propose || "non indiqué",
     };
   });
-}
-
-const COLONNES = [
-  { cle: "coche", titre: "Comparer" },
-  { cle: "hotel", titre: "Hôtel" },
-  { cle: "categorie", titre: "Catégorie" },
-  { cle: "plusBas", titre: "Prix le plus bas", num: true },
-  { cle: "site", titre: "Site le moins cher" },
-  { cle: "dernier", titre: "Dernier prix", num: true },
-  { cle: "evolution", titre: "Évolution", num: true },
-  { cle: "note", titre: "Note /10", num: true },
-  { cle: "avis", titre: "Nb d'avis", num: true },
-  { cle: "resto", titre: "Restaurant" },
-  { cle: "pdj", titre: "Petit-déjeuner" },
-];
-
-function dessinerTableau() {
-  const lignes = lignesTableau();
   const { col, asc } = etat.tri;
   lignes.sort((a, b) => {
     const x = a[col], y = b[col];
@@ -357,184 +592,189 @@ function dessinerTableau() {
     if (y == null) return -1;
     return (typeof x === "number" ? x - y : String(x).localeCompare(String(y), "fr")) * (asc ? 1 : -1);
   });
-  const entete = "<thead><tr>" + COLONNES.map((c) =>
-    `<th data-col="${c.cle}" class="${c.num ? "num " : ""}${c.cle === col ? "tri" + (asc ? " asc" : "") : ""}">${c.titre}</th>`).join("") + "</tr></thead>";
-  const corps = lignes.map((l) => {
-    const evo = l.evolution == null ? "—" :
-      `<span class="${l.evolution > 0.5 ? "hausse" : l.evolution < -0.5 ? "baisse" : ""}">${l.evolution > 0 ? "▲ +" : l.evolution < 0 ? "▼ " : ""}${l.evolution.toFixed(1).replace(".", ",")} %</span>`;
-    return `<tr>
-      <td><input type="checkbox" data-hotel="${echapper(l.hotel)}" ${etat.coches.has(l.hotel) ? "checked" : ""} aria-label="Comparer ${echapper(l.hotel)}"></td>
-      <td><span class="pastille" style="background:${couleur(l.idx)}"></span>${echapper(l.hotel)}</td>
+  $("tableau").innerHTML = "<thead><tr>" + COLONNES.map((c) =>
+    `<th data-col="${c.cle}" class="${c.num ? "num " : ""}${c.cle === col ? "tri" + (asc ? " asc" : "") : ""}">${c.titre}</th>`).join("") + "</tr></thead><tbody>" +
+    lignes.map((l) => `<tr>
+      <td><span class="puce" style="display:inline-block;margin-right:6px;background:${couleur(l.hotel)}"></span>${echapper(l.hotel)}</td>
       <td>${echapper(l.categorie)}</td>
       <td class="num">${euros(l.plusBas)}${l.plusBasJour ? `<br><span class="discret">le ${dateCourte(l.plusBasJour)}</span>` : ""}</td>
       <td>${echapper(l.site) || "—"}</td>
       <td class="num">${euros(l.dernier)}</td>
-      <td class="num">${evo}</td>
-      <td class="num">${l.note != null && !isNaN(l.note) ? l.note.toFixed(1).replace(".", ",") : "—"}</td>
-      <td class="num">${l.avis != null && !isNaN(l.avis) ? l.avis.toLocaleString("fr-FR") : "—"}</td>
-      <td>${echapper(l.resto)}</td>
-      <td>${echapper(l.pdj)}</td>
-    </tr>`;
-  }).join("");
-  $("tableau").innerHTML = entete + "<tbody>" + corps + "</tbody>";
+      <td class="num">${l.evolution == null ? "—" : `<span class="${l.evolution > 0.5 ? "hausse" : l.evolution < -0.5 ? "baisse" : ""}">${pourcent(l.evolution)}</span>`}</td>
+      <td class="num">${l.note == null ? "—" : l.note.toFixed(1).replace(".", ",")}</td>
+      <td class="num">${l.avis == null ? "—" : l.avis.toLocaleString("fr-FR")}</td>
+      <td>${echapper(l.resto)}</td><td>${echapper(l.pdj)}</td></tr>`).join("") + "</tbody>";
 }
-
 $("tableau").addEventListener("click", (e) => {
   const th = e.target.closest("th");
-  if (th && th.dataset.col !== "coche") {
-    const col = th.dataset.col;
-    etat.tri = { col, asc: etat.tri.col === col ? !etat.tri.asc : true };
-    dessinerTableau();
-  }
+  if (!th) return;
+  etat.tri = { col: th.dataset.col, asc: etat.tri.col === th.dataset.col ? !etat.tri.asc : true };
+  dessinerTableau();
 });
-$("tableau").addEventListener("change", (e) => {
-  const h = e.target.dataset.hotel;
-  if (!h) return;
-  e.target.checked ? etat.coches.add(h) : etat.coches.delete(h);
-  dessinerComparateur();
-});
+["f-debut", "f-fin", "f-site"].forEach((id) => $(id).addEventListener("change", () => { dessinerGraphique(); dessinerTableau(); }));
+$("b-hotel").onclick = () => { etat.modeCourbes = "hotel"; $("b-hotel").setAttribute("aria-pressed", "true"); $("b-cat").setAttribute("aria-pressed", "false"); dessinerGraphique(); };
+$("b-cat").onclick = () => { etat.modeCourbes = "cat"; $("b-cat").setAttribute("aria-pressed", "true"); $("b-hotel").setAttribute("aria-pressed", "false"); dessinerGraphique(); };
 
-// ------------------------- Comparateur -------------------------
-function dessinerComparateur() {
-  const zone = $("cartes");
-  const choisis = etat.ordreHotels.filter((h) => etat.coches.has(h));
+// ------------------------- Comparer -------------------------
+function dessinerComparer() {
+  $("choix").innerHTML = etat.ordreHotels.map((h) =>
+    `<button type="button" data-choix="${echapper(h)}" aria-pressed="${etat.choisis.has(h)}"><span class="puce" style="background:${couleur(h)}"></span>${echapper(h)}</button>`).join("");
+  const choisis = etat.ordreHotels.filter((h) => etat.choisis.has(h));
   if (choisis.length < 2) {
-    zone.innerHTML = `<p class="vide">Cochez au moins 2 hôtels dans le tableau ci-dessus.</p>`;
+    $("comparaison").innerHTML = `<p class="vide">Choisissez au moins 2 hôtels ci-dessus.</p>`;
     return;
   }
-  const filtres = prixFiltres(), f = fiches();
-  zone.innerHTML = choisis.map((h) => {
-    const lignes = filtres.filter((l) => l.hotel === h);
+  $("comparaison").innerHTML = choisis.map((h) => {
+    const lignes = etat.prix.filter((l) => l.hotel === h && l.sejour === etat.sejour);
     const jour = lignes.reduce((m, l) => (l.date_releve > m ? l.date_releve : m), "");
-    const derniers = lignes.filter((l) => l.date_releve === jour).sort((a, b) => a.prix_nuit_eur - b.prix_nuit_eur);
-    const a = dernierAvis(h) || {}, fi = f[h] || {};
+    const derniers = lignes.filter((l) => l.date_releve === jour).sort((a, b) => nombre(a.prix_nuit_eur) - nombre(b.prix_nuit_eur));
+    const n = noteSur10(h) || {}, info = etat.infos[h] || {};
     const sites = derniers.length ? derniers.map((l, i) => `<li class="${i === 0 ? "moins-cher" : ""}">
         <span>${l.lien ? `<a href="${echapper(l.lien)}" target="_blank" rel="noopener">${echapper(l.site)}</a>` : echapper(l.site)}${l.offre ? `<br><span class="discret">${echapper(l.offre)}</span>` : ""}</span>
-        <span>${euros(parseFloat(l.prix_nuit_eur))}</span></li>`).join("") : `<li>Aucun prix relevé</li>`;
+        <span>${euros(nombre(l.prix_nuit_eur))}</span></li>`).join("") : `<li>Aucun prix pour ce séjour</li>`;
     return `<div class="fiche">
-      <h3><span class="pastille" style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;background:${couleur(etat.ordreHotels.indexOf(h))}"></span>${echapper(h)}</h3>
+      <div class="nom"><span class="puce" style="background:${couleur(h)}"></span><h3>${echapper(h)}</h3></div>
       <dl>
         <dt>Catégorie</dt><dd>${echapper(categorie(h))}</dd>
-        <dt>Note</dt><dd>${a.note_sur_10 ? String(a.note_sur_10).replace(".", ",") + " /10" : "—"} ${a.nombre_avis ? `<span class="discret">(${parseInt(a.nombre_avis).toLocaleString("fr-FR")} avis)</span>` : ""}</dd>
-        <dt>Restaurant</dt><dd>${echapper(fi.restaurant_sur_place || "non indiqué")}</dd>
-        <dt>Petit-déj.</dt><dd>${echapper(fi.petit_dejeuner_propose || "non indiqué")}</dd>
+        <dt>Note</dt><dd>${isNaN(n.note) ? "—" : n.note.toFixed(1).replace(".", ",") + " /10"} ${isNaN(n.avis) ? "" : `<span class="discret">(${n.avis.toLocaleString("fr-FR")} avis)</span>`}</dd>
+        <dt>Restaurant</dt><dd>${echapper(info.restaurant_sur_place || "non indiqué")}</dd>
+        <dt>Petit-déj.</dt><dd>${echapper(info.petit_dejeuner_propose || "non indiqué")}</dd>
       </dl>
-      ${a.notes_detaillees ? `<p class="discret">${echapper(a.notes_detaillees)}</p>` : ""}
-      ${fi.equipements_principaux ? `<p class="discret">${echapper(fi.equipements_principaux)}</p>` : ""}
+      ${n.detail ? `<p class="discret">${echapper(n.detail)}</p>` : ""}
+      ${info.equipements_principaux ? `<p class="discret">${echapper(info.equipements_principaux)}</p>` : ""}
       <strong style="font-size:.85rem">Prix par site ${jour ? "(" + dateCourte(jour) + ")" : ""}</strong>
-      <ul>${sites}</ul>
-    </div>`;
+      <ul>${sites}</ul></div>`;
   }).join("");
 }
+$("choix").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-choix]");
+  if (!b) return;
+  const h = b.dataset.choix;
+  etat.choisis.has(h) ? etat.choisis.delete(h) : etat.choisis.add(h);
+  dessinerComparer();
+});
 
-// ------------------------- Mise en place -------------------------
-function toutDessiner() { dessinerGraphique(); dessinerTableau(); dessinerComparateur(); }
-
-function remplirFiltres() {
-  // Séjours, dans l'ordre d'apparition
-  const sejours = [...new Set(etat.prix.map((l) => l.sejour))];
-  const choisi = $("f-sejour").value;
-  $("f-sejour").innerHTML = sejours.map((s) => {
-    const d = etat.prix.filter((l) => l.sejour === s).map((l) => l.date_sejour).sort().pop();
-    return `<option value="${echapper(s)}">${echapper(s)}${s.startsWith("Dans") ? "" : " (" + dateCourte(d) + ")"}</option>`;
-  }).join("");
-  if (sejours.includes(choisi)) $("f-sejour").value = choisi;
-  const sites = [...new Set(etat.prix.map((l) => l.site))].sort((a, b) => a.localeCompare(b, "fr"));
-  $("f-site").innerHTML = `<option value="">Tous (le moins cher)</option>` + sites.map((s) => `<option>${echapper(s)}</option>`).join("");
-  const jours = etat.prix.map((l) => l.date_releve).sort();
-  $("f-debut").value = jours[0]; $("f-fin").value = jours[jours.length - 1];
-  $("f-debut").min = $("f-fin").min = jours[0];
-  $("f-debut").max = $("f-fin").max = jours[jours.length - 1];
-}
-
-function afficherEntete() {
-  const jours = etat.prix.map((l) => l.date_releve).sort();
-  $("maj").textContent = jours.length ? dateFr(jours[jours.length - 1]) : "pas encore";
+// ------------------------- Pilotage -------------------------
+function dessinerPilotage(d) {
+  $("p-derniere").textContent = "Dernière collecte : " + (d.etat.derniereCollecte || "aucune");
+  $("p-maj").textContent = "Programme : " + (d.etat.miseAJour || "pas encore d'information");
+  $("essai-hotel").innerHTML = etat.reglages.hotels.map((h) => `<option>${echapper(h)}</option>`).join("");
   const u = etat.usage[etat.usage.length - 1];
-  if (!u || !u.requetes_ce_mois) {
-    $("quota").textContent = "pas encore";
-  } else {
-    const n = parseInt(u.requetes_ce_mois), q = parseInt(u.quota_mois) || 250;
-    $("quota").textContent = `${n} / ${q}`;
-    $("quota-jauge").style.width = Math.min(100, (100 * n) / q) + "%";
+  const quota = (u && parseInt(u.quota_mois, 10)) || etat.reglages.quota || 250;
+  const utilisees = u ? parseInt(u.requetes_ce_mois, 10) : NaN;
+  $("p-quota").textContent = isNaN(utilisees) ? "—" : `${utilisees} / ${quota}`;
+  $("p-jauge").style.width = isNaN(utilisees) ? "0" : Math.min(100, (100 * utilisees) / quota) + "%";
+  $("p-quota-detail").textContent = u && u.requetes_restantes !== "" ? `${u.requetes_restantes} requêtes restantes ce mois-ci` : "pas encore de relevé";
+  const r = etat.reglages;
+  const estimation = Math.round((r.dates.length * 30) / Math.max(1, r.frequence_jours || 1) + r.hotels.length * 4.3);
+  $("p-estimation").textContent = `Avec les réglages actuels : environ ${estimation} requêtes par mois (${r.dates.length} dates × 30 jours, plus ${r.hotels.length} fiches détaillées par semaine).`;
+  const b = d.budget;
+  if (b) {
+    const tient = b.besoin <= b.restantes - b.reserve;
+    $("p-budget").className = "budget " + (tient ? "ok" : "attention");
+    $("p-budget").innerHTML = `<strong>${tient ? "✓ Le quota tiendra jusqu'à la fin du mois" : "⚠ Rythme trop élevé pour finir le mois"}</strong><br>
+      Besoin estimé d'ici la fin du mois (${b.joursRestants} jour${b.joursRestants > 1 ? "s" : ""}) : ${b.besoin} requêtes · restantes : ${b.restantes} (dont ${b.reserve} de réserve).
+      ${tient ? "" : "<br>Le script réduit tout seul : d'abord les fiches détaillées, puis le nombre de dates. Le quota ne sera pas dépassé."}`;
+  }
+  $("p-automatisme").textContent = `Collecte chaque jour vers ${r.heure} h${r.a_l_ouverture ? " et à l'ouverture du classeur" : ""} · fiches détaillées le ${r.jour_fiches}.`;
+  $("p-hotels").innerHTML = r.hotels.map((h) => `<li>${echapper(h)}</li>`).join("") || "<li>aucun</li>";
+  $("p-dates").innerHTML = r.dates.map((x) => `<li>${echapper(x.nom)} : ${dateLongue(x.arrivee)}</li>`).join("") || "<li>aucune date à venir</li>";
+  $("lien-reglages").href = d.urlReglages;
+  $("lien-classeur").href = d.urlClasseur;
+  $("p-journal").innerHTML = etat.journal.length ? etat.journal.map((j) =>
+    `<details><summary><span>${echapper(j.date)}</span>${echapper(j.resultat)}</summary><div class="resultat">${echapper(j.detail || "(pas de détail)")}</div></details>`).join("")
+    : `<p class="discret">Aucune collecte enregistrée pour l'instant.</p>`;
+}
+
+document.querySelectorAll("[data-action]").forEach((b) => b.addEventListener("click", () => {
+  const action = b.dataset.action;
+  if (action === "essai") return lancer({ action: "essai", hotel: $("essai-hotel").value });
+  if (action === "fiches" && !confirm("Collecte complète + fiches détaillées : environ 12 requêtes SerpApi. Continuer ?")) return;
+  lancer({ action });
+}));
+
+// ------------------------- Collecte -------------------------
+function pastille(html, genre = "") {
+  const p = $("pastille");
+  p.className = "pastille " + genre;
+  p.innerHTML = html;
+}
+
+async function lancer(demande) {
+  const boutons = document.querySelectorAll("[data-action], #b-collecte");
+  boutons.forEach((b) => (b.disabled = true));
+  const essai = demande.action === "essai";
+  pastille(`<span class="tourne"></span>${essai ? "Essai en cours…" : "Collecte en cours… (≈ 1 min)"}`);
+  try {
+    const r = await serveur("collecterDepuisPage", demande);
+    if (essai || etat.vue === "pilotage") { $("p-resultat").hidden = false; $("p-resultat").textContent = r.message + (r.journal ? "\n\n" + r.journal : ""); }
+    await charger();
+    pastille((r.ok ? "✓ " : "✗ ") + echapper(r.message), r.ok ? "ok" : "erreur");
+    toast(r.message);
+  } catch (e) {
+    pastille("✗ " + echapper(e.message || e), "erreur");
+  } finally {
+    boutons.forEach((b) => (b.disabled = false));
   }
 }
+$("b-collecte").addEventListener("click", () => {
+  const u = etat.usage[etat.usage.length - 1];
+  const reste = u && u.requetes_restantes !== "" ? ` Il vous en reste ${u.requetes_restantes} ce mois-ci.` : "";
+  if (confirm("Relancer une collecte complète maintenant ? Environ 4 requêtes SerpApi (12 le jour des fiches)." + reste)) lancer({ action: "collecte" });
+});
 
-// Charge les données du classeur puis dessine tout (au démarrage et après une collecte)
-async function chargerEtAfficher() {
-  const d = await serveur("lireDonnees");
-  [etat.prix, etat.avis, etat.hotels, etat.usage] = [d.prix, d.avis, d.hotels, d.usage];
-  $("lien-classeur").href = d.urlClasseur;
-  $("lien-classeur").hidden = false;
-  // Ordre fixe des hôtels = ordre de première apparition (donne les couleurs)
-  etat.ordreHotels = [...new Set([...etat.hotels.map((l) => l.hotel), ...etat.prix.map((l) => l.hotel)])];
-  afficherEntete();
-  const vide = !etat.prix.length;
-  $("vide").hidden = !vide;
-  document.querySelectorAll("section.carte:not(#vide)").forEach((sec) => (sec.hidden = vide));
-  if (vide) return;
-  remplirFiltres();
-  // Pré-cocher les 2 premiers hôtels pour montrer le comparateur
-  if (!etat.coches.size) etat.ordreHotels.slice(0, 2).forEach((h) => etat.coches.add(h));
+// ------------------------- Onglets et chargement -------------------------
+document.querySelector(".onglets").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-vue]");
+  if (!b) return;
+  etat.vue = b.dataset.vue;
+  document.querySelectorAll(".onglet").forEach((o) => o.setAttribute("aria-selected", String(o === b)));
   toutDessiner();
+});
+
+function toutDessiner() {
+  const vide = !etat.prix.length;
+  dessinerSejours();
+  $("vide").hidden = !(vide && etat.vue !== "pilotage");
+  ["apercu", "evolution", "comparer", "pilotage"].forEach((v) => ($("v-" + v).hidden = v !== etat.vue || (vide && v !== "pilotage")));
+  if (vide && etat.vue !== "pilotage") return;
+  if (etat.vue === "apercu") dessinerApercu();
+  if (etat.vue === "evolution") { dessinerGraphique(); dessinerTableau(); }
+  if (etat.vue === "comparer") dessinerComparer();
+}
+
+let derniereDonnees = null;
+async function charger() {
+  const d = await serveur("lireDonnees");
+  derniereDonnees = d;
+  Object.assign(etat, { prix: d.prix, avis: d.avis, hotels: d.hotels, usage: d.usage, reglages: d.reglages, journal: d.journal });
+  etat.infos = {};
+  d.hotels.forEach((l) => { etat.infos[l.hotel] = l; });
+  etat.ordreHotels = [...new Set([...d.reglages.hotels, ...d.prix.map((l) => l.hotel)])];
+  const jours = d.prix.map((l) => l.date_releve).sort();
+  $("sous-titre").textContent = jours.length
+    ? `Dernier relevé : ${dateLongue(jours[jours.length - 1])} · ${d.reglages.hotels.length} hôtels suivis`
+    : `${d.reglages.hotels.length} hôtels suivis · pas encore de prix`;
+  if (!etat.choisis.size) etat.ordreHotels.slice(0, 2).forEach((h) => etat.choisis.add(h));
+  remplirFiltresEvolution();
+  dessinerPilotage(d);
+  toutDessiner();
+  return d;
 }
 
 async function demarrer() {
-  ["f-sejour", "f-debut", "f-fin", "f-site"].forEach((id) => $(id).addEventListener("change", toutDessiner));
-  $("b-hotel").onclick = () => { etat.mode = "hotel"; $("b-hotel").setAttribute("aria-pressed", "true"); $("b-cat").setAttribute("aria-pressed", "false"); dessinerGraphique(); };
-  $("b-cat").onclick = () => { etat.mode = "cat"; $("b-cat").setAttribute("aria-pressed", "true"); $("b-hotel").setAttribute("aria-pressed", "false"); dessinerGraphique(); };
-  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => etat.prix.length && toutDessiner());
-  $("b-relancer").onclick = () => {
-    const u = etat.usage[etat.usage.length - 1];
-    const reste = u && u.requetes_restantes !== "" ? ` Il vous en reste ${u.requetes_restantes} ce mois-ci.` : "";
-    if (confirm("Relancer une collecte complète maintenant ? Elle utilise environ 4 requêtes SerpApi (12 le jour des fiches)." + reste)) lancer(true);
-  };
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", toutDessiner);
   try {
-    await chargerEtAfficher();
-    verifierCollecte();
-  } catch (e) {
-    statut("Impossible de lire le classeur : " + echapper(e.message || e), "erreur");
+    const d = await charger();
+    const e = d.etat;
+    if (!e.cleOk) pastille("Clé SerpApi absente (case jaune des Réglages)", "erreur");
+    else if (e.faite) pastille("✓ Collecte du jour faite", "ok");
+    else if (e.aOuverture) lancer({ action: "auto" }); // la collecte du jour n'est pas faite : on la lance
+    else pastille("Collecte automatique chaque jour");
+  } catch (err) {
+    pastille("Impossible de lire le classeur : " + echapper(err.message || err), "erreur");
   }
 }
-
-// =====================================================================
-//  Collecte à l'ouverture de la page : si celle du jour n'est pas faite,
-//  la page demande au script du classeur de la lancer (une seule par jour).
-// =====================================================================
-function statut(html, genre = "") {
-  const el = $("statut-collecte");
-  el.className = "petit " + genre;
-  el.innerHTML = html;
-}
-
-async function verifierCollecte() {
-  const e = await serveur("etatCollecte");
-  $("b-relancer").hidden = !e.cleOk;
-  if (!e.cleOk) { statut("Clé SerpApi pas encore enregistrée (menu Veille hôtels du classeur).", "erreur"); return; }
-  if (e.faite) { statut("✓ Collecte du jour déjà faite.", "ok"); return; }
-  if (e.aOuverture) lancer(false);
-  else statut("Collecte automatique chaque jour.");
-}
-
-async function lancer(forcer) {
-  $("b-relancer").disabled = true;
-  statut('<span class="tourne"></span>Collecte en cours… (environ 1 minute)');
-  try {
-    const r = await serveur("collecterDepuisPage", forcer);
-    if (r.faite) {
-      statut('<span class="tourne"></span>Chargement des nouvelles données…');
-      await chargerEtAfficher();
-      statut("✓ " + echapper(r.message), "ok");
-    } else {
-      statut(echapper(r.message), r.ok ? "ok" : "erreur");
-    }
-  } catch (e) {
-    statut("La collecte a échoué : " + echapper(e.message || e), "erreur");
-  } finally {
-    $("b-relancer").disabled = false;
-  }
-}
-
 demarrer();
 </script>
 </body>

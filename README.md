@@ -107,7 +107,7 @@ Gardez l'adresse (elle finit par `/exec`) dans vos favoris, sur téléphone auss
 | Lancer la collecte maintenant | Collecte complète | ~4 requêtes (+8 le jour des fiches) |
 | Essai | 1 hôtel, 1 date, n'enregistre rien | 2 requêtes |
 | Collecte + fiches détaillées | Collecte complète + fiches de tous les hôtels | ~12 requêtes |
-| Voir le compteur SerpApi | Requêtes utilisées et restantes ce mois-ci | gratuit |
+| Voir le compteur SerpApi | Ouvre le tableau de bord (compteur dans l'onglet Pilotage) | gratuit |
 | Enregistrer la clé SerpApi | Remplace la clé (ou collez-la dans Réglages) | gratuit |
 | Activer / Désactiver l'automatisation | Collecte quotidienne et à l'ouverture | — |
 | Mettre à jour le programme depuis GitHub | Prend tout de suite la dernière version | gratuit |
@@ -120,7 +120,24 @@ Gardez l'adresse (elle finit par `/exec`) dans vos favoris, sur téléphone auss
 - **Une fois par semaine** (lundi par défaut) : 1 fiche détaillée par hôtel (plus de sites, étoiles, restauration, petit-déjeuner inclus, notes détaillées) → 8 × ~4,3 = **~35/mois**.
 - **Total ≈ 155/mois** sur 250.
 
-Sécurités : avant chaque collecte, le script lit le compteur SerpApi (gratuit). S'il risque de dépasser le quota, il saute les fiches, puis réduit le nombre de dates, puis s'arrête. La « Réserve de requêtes » (15) reste pour vos essais.
+### Que se passe-t-il si on dépasse 250 ?
+
+SerpApi refuse simplement les recherches suivantes jusqu'au mois suivant (message « plus de recherches disponibles »).
+L'offre gratuite ne demande pas de carte bancaire : rien n'est facturé. Mais il n'y aurait plus de relevés jusqu'à la remise à zéro.
+
+### Pourquoi ça n'arrivera pas
+
+Avant **chaque** collecte (automatique, à l'ouverture, bouton, menu ou essai), le script :
+
+1. lit les requêtes restantes sur le compte SerpApi (gratuit) ; si SerpApi ne répond pas, il les estime avec l'onglet **Compteur** ;
+2. garde toujours la **Réserve de requêtes** des Réglages (15) : elle n'est jamais entamée ;
+3. calcule le **besoin d'ici la fin du mois** avec les réglages actuels ; si le rythme ne tient pas, il réduit tout seul :
+   d'abord les **fiches détaillées**, puis le **nombre de dates** (celles du **haut** de la liste des Réglages passent en premier) ;
+4. ne fait jamais plus de 45 requêtes d'un coup (SerpApi en accepte 50 par heure) ;
+5. s'arrête net quand il ne reste que la réserve : « Quota SerpApi atteint… pas de collecte avant le mois prochain ».
+
+Chaque décision est notée dans l'onglet **Journal** (lignes « Budget » et « Économie de requêtes »).
+L'onglet **Pilotage** du tableau de bord affiche le besoin estimé d'ici la fin du mois face aux requêtes restantes.
 
 Pour estimer un changement : **(dates × 30 ÷ fréquence) + (hôtels × 4,3)**.
 
@@ -138,13 +155,21 @@ Pour estimer un changement : **(dates × 30 ÷ fréquence) + (hôtels × 4,3)**.
 
 ---
 
-## Lire la page web
+## Le tableau de bord
 
-- **En haut** : dernière mise à jour, compteur de requêtes, état de la collecte, lien vers le classeur.
-- **Réglages de la page** : séjour suivi, période (Du / Au), site (tous ou un seul), courbes par hôtel ou par catégorie.
-- **Graphique** : le prix le plus bas relevé chaque jour pour le séjour choisi. Touchez une courbe pour voir les valeurs ; cliquez un nom de la légende pour le masquer.
-- **Tableau comparatif** : prix le plus bas (et sa date), site le moins cher, dernier prix, évolution (▲ hausse, ▼ baisse), note /10, avis, restauration. Cliquez un titre pour trier.
-- **Comparateur** : cochez 2 hôtels ou plus ; ils s'affichent côte à côte avec les prix site par site et les offres (annulation gratuite, petit-déjeuner inclus, site officiel).
+Il **s'ouvre tout seul avec le classeur** (réglage « Ouvrir le tableau de bord à l'ouverture »), et à tout moment par le menu
+**Veille hôtels → Voir le compteur SerpApi** (le compteur est en haut de l'onglet Pilotage).
+Si la collecte du jour n'est pas faite, il la lance et se met à jour tout seul. La même page sert d'application Web sur téléphone (voir plus haut).
+
+- **En haut** : date du dernier relevé, état de la collecte, bouton **Relancer la collecte**, puis le **séjour suivi** (Noël, février…) : un clic change toute la page.
+- **Aperçu** : les indicateurs (le moins cher, prix médian, le mieux noté, hôtels avec un prix) et une **carte par hôtel** :
+  photo, étoiles, note /10 et avis, prix le plus bas au dernier relevé et son site (avec le lien « voir l'offre »),
+  évolution depuis le premier relevé (▲ hausse, ▼ baisse), mini-courbe, restaurant et petit-déjeuner.
+  Une carte grisée = pas de prix pour ce séjour (complet, fermé ou non trouvé). Triez par prix, note, baisse ou nom.
+- **Évolution** : le graphique des prix (période, site, courbes par hôtel ou par catégorie) et le tableau comparatif triable.
+- **Comparer** : choisissez 2 hôtels ou plus (ou cochez « Comparer » sur les cartes) pour voir leurs prix site par site et leurs offres.
+- **Pilotage** : lancer une collecte, une collecte avec fiches détaillées ou un essai sur un hôtel ; compteur SerpApi et estimation mensuelle ;
+  résumé des réglages (bouton « Modifier les réglages ») ; journal des dernières collectes, avec le détail hôtel par hôtel.
 
 ---
 
