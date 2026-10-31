@@ -250,7 +250,7 @@ function lireDonnees() {
     reglages: {
       hotels: cfg.hotels.map(h => h.nom),
       dates: datesValides(cfg, []).map(d => ({ nom: d.nom, arrivee: d.arrivee })),
-      heure: cfg.heure, frequence_jours: cfg.frequence_jours, jour_fiches: cfg.jour_fiches,
+      heure: cfg.heure, frequence_jours: cfg.frequence_jours, fiches_par_jour: cfg.fiches_par_jour,
       a_l_ouverture: cfg.a_l_ouverture, quota: cfg.quota,
     },
     journal: lireJournal(15),
@@ -365,17 +365,14 @@ function collecterSansVerrou(opts, journal) {
     sejours = sejours.slice(0, 1);
   }
 
-  // Fiches détaillées : tous les hôtels le jour prévu, sinon seulement les nouveaux
-  const jourSemaine = JOURS[Number(Utilities.formatDate(new Date(), FUSEAU, 'u')) - 1];
-  let fichesPour = (opts.essai || opts.fiches || jourSemaine === cfg.jour_fiches)
-    ? hotels.map(h => h.nom)
-    : hotels.filter(h => !fichesConnues[h.nom]).map(h => h.nom);
+  // Fiches détaillées (prix site par site) : quelques-unes chaque jour, à tour de rôle ;
+  // toutes d'un coup avec le menu « Collecte + fiches détaillées » ; une seule pour un essai
+  const nbFichesVoulues = opts.essai ? 1 : opts.fiches ? hotels.length : cfg.fiches_par_jour;
 
   // --- Budget : ne jamais dépasser le quota SerpApi ---
-  const budget = budgetCollecte(cfg, compte, sejours, fichesPour, !!opts.essai, journal);
+  const budget = budgetCollecte(cfg, compte, sejours, nbFichesVoulues, !!opts.essai, journal);
   if (budget.arret) return { ok: false, faite: false, journal: journal.join('\n'), message: budget.arret };
   sejours = budget.sejours;
-  fichesPour = budget.fichesPour;
 
   // --- 1) Recherche par date : prix par site + notes, pour tous les hôtels d'un coup ---
   let prix = [];
@@ -401,39 +398,71 @@ function collecterSansVerrou(opts, journal) {
     });
   });
 
-  // --- 2) Fiches détaillées : plus de sites, petit-déjeuner inclus, étoiles, notes détaillées ---
-  if (fichesPour.length) {
-    const s = sejours[0];
-    journal.push('> Fiches détaillées (prix pour « ' + s.nom + ' »)');
-    hotels.forEach(h => {
-      if (!fichesPour.includes(h.nom)) return;
-      const p = infos[h.nom];
-      const jeton = (p && p.property_token) || jetonsConnus[h.nom];
-      if (!jeton) return;
-      let fiche;
+  // --- 2) Recherche ciblée sur le nom d'un hôtel jamais trouvé (au plus une par collecte) ---
+  if (budget.cible && !opts.essai) {
+    const memoire = PropertiesService.getScriptProperties();
+    const candidat = hotels.find(h => !infos[h.nom] && !jetonsConnus[h.nom]
+      && ecartJours(memoire.getProperty('cible|' + h.nom) || '2000-01-01', jour) >= 7);
+    if (candidat) {
+      memoire.setProperty('cible|' + candidat.nom, jour);
+      const s = sejours[0];
+      journal.push('> Recherche ciblée : « ' + candidat.nom + ' »');
       try {
-        fiche = appelerSerpapi({ property_token: jeton, check_in_date: s.arrivee,
+        const donnees = appelerSerpapi({ q: candidat.nom + ' ' + cfg.ville, check_in_date: s.arrivee,
           check_out_date: s.depart, adults: cfg.adultes }, etat);
+        // Google renvoie soit une liste, soit directement la fiche de l'hôtel
+        const proprietes = donnees.properties || (donnees.property_token ? [donnees] : []);
+        const p = associerHotels([candidat], proprietes, {})[candidat.nom];
+        if (p) {
+          infos[candidat.nom] = p;
+          let lignes = lignesPrix(p, (p.featured_prices || []).concat(p.prices || []), jour, candidat.nom, s.nom, s.arrivee);
+          if (!lignes.length && prixNuit(p) !== null) {
+            lignes = [{ date_releve: jour, hotel: candidat.nom, sejour: s.nom, date_sejour: s.arrivee,
+              site: 'Google (prix le plus bas)', prix_nuit_eur: prixNuit(p), offre: '', lien: p.link || '' }];
+          }
+          prix = prix.concat(lignes);
+          if (p.overall_rating) avis[candidat.nom] = ligneAvis(jour, candidat.nom, p, notesDetaillees(p));
+          journal.push('  - trouvé (Google : « ' + p.name + ' ») : ' + lignes.length + ' site(s). Il aura ses fiches à tour de rôle.');
+        } else {
+          journal.push('  - toujours introuvable : vérifiez son nom sur Google Hotels (colonne « Autres noms » des Réglages). Nouvel essai dans 7 jours.');
+        }
       } catch (e) {
-        journal.push('  - ' + h.nom + ' : fiche indisponible (' + e.message + ')');
-        return;
+        journal.push('  - recherche impossible (' + e.message + ')');
       }
-      const blocs = (fiche.featured_prices || []).concat(fiche.prices || []);
-      const lignes = lignesPrix(fiche, blocs, jour, h.nom, s.nom, s.arrivee);
-      if (lignes.length) { // la fiche est plus complète : elle remplace la recherche pour cette date
-        prix = prix.filter(l => !(l.hotel === h.nom && l.date_sejour === s.arrivee)).concat(lignes);
-      }
-      if (fiche.overall_rating) avis[h.nom] = ligneAvis(jour, h.nom, fiche, notesDetaillees(fiche));
-      infos[h.nom] = Object.assign({}, p || {}, fiche, { property_token: jeton });
-      journal.push('  - ' + h.nom + ' : ' + lignes.length + ' site(s), note ' + (fiche.overall_rating || '?'));
-    });
+    }
   }
+
+  // --- 3) Fiches détaillées : prix site par site, petit-déjeuner, étoiles, notes détaillées ---
+  const taches = choisirFiches(hotels, sejours, infos, jetonsConnus, budget.nbFiches, opts);
+  const detailles = [];
+  if (taches.length) journal.push('> Fiches détaillées (à tour de rôle)');
+  taches.forEach(({ hotel: h, sejour: s, jeton }) => {
+    let fiche;
+    try {
+      fiche = appelerSerpapi({ property_token: jeton, check_in_date: s.arrivee,
+        check_out_date: s.depart, adults: cfg.adultes }, etat);
+    } catch (e) {
+      journal.push('  - ' + h.nom + ' (' + s.nom + ') : fiche indisponible (' + e.message + ')');
+      return;
+    }
+    PropertiesService.getScriptProperties().setProperty('fiche|' + h.nom + '|' + s.nom, jour);
+    const blocs = (fiche.featured_prices || []).concat(fiche.prices || []);
+    const lignes = lignesPrix(fiche, blocs, jour, h.nom, s.nom, s.arrivee);
+    if (lignes.length) { // la fiche est plus complète : elle remplace la recherche pour cette date
+      prix = prix.filter(l => !(l.hotel === h.nom && l.date_sejour === s.arrivee)).concat(lignes);
+    }
+    if (fiche.overall_rating) avis[h.nom] = ligneAvis(jour, h.nom, fiche, notesDetaillees(fiche));
+    infos[h.nom] = Object.assign({}, infos[h.nom] || {}, fiche, { property_token: jeton });
+    detailles.push(h.nom);
+    journal.push('  - ' + h.nom + ' (' + s.nom + ') : ' + (lignes.length ? lignes.length + ' site(s)' : 'pas de prix (complet ou fermé ?)')
+      + ', note ' + (fiche.overall_rating || '?'));
+  });
 
   // Fiche hôtel : écrite si elle vient d'être détaillée, ou si l'hôtel est nouveau
   const fiches = [];
   hotels.forEach(h => {
     const p = infos[h.nom];
-    if (!p || !(fichesPour.includes(h.nom) || !fichesConnues[h.nom])) return;
+    if (!p || !(detailles.includes(h.nom) || !fichesConnues[h.nom])) return;
     const resto = restauration(p);
     fiches.push({ date_maj: jour, hotel: h.nom, nom_google: p.name || '', categorie_etoiles: etoiles(p),
       restaurant_sur_place: resto[0], petit_dejeuner_propose: resto[1],
@@ -479,6 +508,40 @@ function collecterSansVerrou(opts, journal) {
 }
 
 
+/**
+ * Choisit les fiches détaillées du jour : des couples hôtel + date. D'abord les hôtels détaillés il y a
+ * le plus longtemps (jamais = en premier ; à égalité, ceux sans prix dans la recherche du jour),
+ * puis, pour chaque hôtel, sa date détaillée il y a le plus longtemps.
+ * Avec le menu « Collecte + fiches détaillées » : tous les hôtels, pour la première date.
+ */
+function choisirFiches(hotels, sejours, infos, jetonsConnus, nombre, opts) {
+  if (!nombre || !sejours.length) return [];
+  const jeton = h => (infos[h.nom] && infos[h.nom].property_token) || jetonsConnus[h.nom];
+  const avecJeton = hotels.filter(jeton);
+  if (opts.fiches || opts.essai) {
+    return avecJeton.slice(0, nombre).map(h => ({ hotel: h, sejour: sejours[0], jeton: jeton(h) }));
+  }
+  const memoire = PropertiesService.getScriptProperties();
+  const couples = [];
+  avecJeton.forEach((h, i) => {
+    const dates = sejours.map(s => memoire.getProperty('fiche|' + h.nom + '|' + s.nom) || '');
+    const hotelDerniere = dates.slice().sort().pop(); // dernière fiche de cet hôtel, toutes dates confondues
+    sejours.forEach((s, j) => couples.push({
+      hotel: h, sejour: s, jeton: jeton(h), ordre: i * 100 + j, derniere: dates[j], hotelDerniere: hotelDerniere,
+      sansPrix: !(infos[h.nom] && prixNuit(infos[h.nom]) !== null),
+    }));
+  });
+  // D'abord l'hôtel détaillé il y a le plus longtemps, puis sa date la plus ancienne
+  couples.sort((a, b) => a.hotelDerniere.localeCompare(b.hotelDerniere) || (b.sansPrix - a.sansPrix)
+    || a.derniere.localeCompare(b.derniere) || (a.ordre - b.ordre));
+  const choisis = [], dejaPris = new Set();
+  // Pas deux fiches du même hôtel le même jour tant qu'il reste d'autres hôtels à détailler
+  couples.forEach(c => { if (choisis.length < nombre && !dejaPris.has(c.hotel.nom)) { choisis.push(c); dejaPris.add(c.hotel.nom); } });
+  couples.forEach(c => { if (choisis.length < nombre && !choisis.includes(c)) choisis.push(c); });
+  return choisis;
+}
+
+
 // =====================================================================
 //  Garde-fou du quota SerpApi (offre gratuite : 250 requêtes par mois, 50 par heure)
 // =====================================================================
@@ -492,9 +555,9 @@ const PLAFOND_PAR_COLLECTE = 45; // SerpApi accepte 50 requêtes par heure : on 
  * - la « Réserve de requêtes » des Réglages n'est jamais entamée ;
  * - si le rythme actuel ne tient pas jusqu'à la fin du mois, on réduit : d'abord les fiches
  *   détaillées, puis le nombre de dates (celles du haut de la liste des Réglages passent en premier).
- * Renvoie { sejours, fichesPour } ou { arret: 'message' }.
+ * Renvoie { sejours, nbFiches, cible } ou { arret: 'message' } (cible : une recherche ciblée est permise).
  */
-function budgetCollecte(cfg, compte, sejours, fichesPour, essai, journal) {
+function budgetCollecte(cfg, compte, sejours, nbFichesVoulues, essai, journal) {
   const restantes = requetesRestantes(cfg, compte);
   const disponible = restantes.valeur - cfg.marge;
   const parDate = cfg.pages_max;
@@ -504,11 +567,14 @@ function budgetCollecte(cfg, compte, sejours, fichesPour, essai, journal) {
   if (disponible < parDate) {
     return { arret: 'Quota SerpApi atteint (réserve de ' + cfg.marge + ' gardée) : pas de collecte avant le mois prochain.' };
   }
-  let fiches = fichesPour, dates = sejours;
-  const tropPourAujourdhui = dates.length * parDate + fiches.length > Math.min(disponible, PLAFOND_PAR_COLLECTE);
-  if (fiches.length && (tropPourAujourdhui || (!essai && projection.total > disponible))) {
-    journal.push("! Économie de requêtes : pas de fiches détaillées aujourd'hui.");
-    fiches = [];
+  let dates = sejours, nbFiches = nbFichesVoulues;
+  if (!essai && projection.total > disponible) {
+    // Le rythme ne tient pas jusqu'à la fin du mois : moins de fiches par jour (voire aucune)
+    nbFiches = Math.min(nbFiches, Math.max(0, Math.floor((disponible - projection.dates) / projection.collectes)));
+  }
+  nbFiches = Math.min(nbFiches, Math.max(0, Math.min(disponible, PLAFOND_PAR_COLLECTE) - dates.length * parDate));
+  if (nbFiches < nbFichesVoulues) {
+    journal.push('! Économie de requêtes : ' + nbFiches + ' fiche(s) détaillée(s) sur ' + nbFichesVoulues + " aujourd'hui.");
   }
   let garde = Math.min(dates.length, Math.floor(Math.min(disponible, PLAFOND_PAR_COLLECTE) / parDate));
   if (!essai && projection.dates > disponible) {
@@ -520,7 +586,10 @@ function budgetCollecte(cfg, compte, sejours, fichesPour, essai, journal) {
       + dates.slice(0, garde).map(d => d.nom).join(', ') + ').');
     dates = dates.slice(0, garde);
   }
-  return { sejours: dates, fichesPour: fiches };
+  // Recherche ciblée d'un hôtel jamais trouvé : seulement s'il reste de la marge
+  const cible = !essai && projection.total + 4 <= disponible
+    && dates.length * parDate + nbFiches + 1 <= Math.min(disponible, PLAFOND_PAR_COLLECTE);
+  return { sejours: dates, nbFiches: nbFiches, cible: cible };
 }
 
 /** Requêtes restantes ce mois-ci : { valeur, source }. */
@@ -540,14 +609,9 @@ function projectionMois(cfg, nbDates) {
   const joursDansLeMois = new Date(Date.UTC(a, m, 0)).getUTCDate();
   const joursRestants = joursDansLeMois - j + 1;
   const collectes = Math.ceil(joursRestants / Math.max(1, cfg.frequence_jours));
-  let joursFiches = 0;
-  for (let k = 0; k < joursRestants; k++) {
-    const jourSemaine = new Date(Date.UTC(a, m - 1, j + k)).getUTCDay(); // 0 = dimanche
-    if (JOURS[(jourSemaine + 6) % 7] === cfg.jour_fiches) joursFiches++;
-  }
   const dates = collectes * nbDates * cfg.pages_max;
-  return { dates: dates, fiches: joursFiches * cfg.hotels.length, total: dates + joursFiches * cfg.hotels.length,
-    collectes: collectes, joursRestants: joursRestants };
+  const fiches = collectes * cfg.fiches_par_jour;
+  return { dates: dates, fiches: fiches, total: dates + fiches, collectes: collectes, joursRestants: joursRestants };
 }
 
 
@@ -783,7 +847,7 @@ function lireReglages() {
     nuits: nombre('Nuits', 1),
     adultes: nombre('Adultes', 2),
     frequence_jours: nombre('Fréquence (en jours)', 1),
-    jour_fiches: String(parLibelle['Jour des fiches détaillées'] || 'lundi').toLowerCase().trim(),
+    fiches_par_jour: Math.max(0, Math.round(nombre('Fiches détaillées par jour', 2))),
     heure: nombre('Heure de la collecte automatique', 7),
     a_l_ouverture: String(parLibelle["Collecter à l'ouverture du classeur"] || 'oui').toLowerCase().trim().startsWith('o'),
     tableau_a_l_ouverture: String(parLibelle["Ouvrir le tableau de bord à l'ouverture"] || 'oui').toLowerCase().trim().startsWith('o'),

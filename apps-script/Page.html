@@ -264,8 +264,8 @@
         <p class="discret" id="p-derniere"></p>
         <p class="discret" id="p-maj"></p>
         <div class="boutons">
-          <button type="button" class="bouton principal" data-action="collecte">Lancer la collecte <small>(≈ 4 requêtes)</small></button>
-          <button type="button" class="bouton" data-action="fiches">Collecte + fiches détaillées <small>(≈ 12)</small></button>
+          <button type="button" class="bouton principal" data-action="collecte">Lancer la collecte <small>(≈ 6 requêtes)</small></button>
+          <button type="button" class="bouton" data-action="fiches">Collecte + toutes les fiches <small>(≈ 12)</small></button>
         </div>
         <div class="boutons">
           <select id="essai-hotel" aria-label="Hôtel à tester"></select>
@@ -666,8 +666,9 @@ function dessinerPilotage(d) {
   $("p-jauge").style.width = isNaN(utilisees) ? "0" : Math.min(100, (100 * utilisees) / quota) + "%";
   $("p-quota-detail").textContent = u && u.requetes_restantes !== "" ? `${u.requetes_restantes} requêtes restantes ce mois-ci` : "pas encore de relevé";
   const r = etat.reglages;
-  const estimation = Math.round((r.dates.length * 30) / Math.max(1, r.frequence_jours || 1) + r.hotels.length * 4.3);
-  $("p-estimation").textContent = `Avec les réglages actuels : environ ${estimation} requêtes par mois (${r.dates.length} dates × 30 jours, plus ${r.hotels.length} fiches détaillées par semaine).`;
+  const collectes = 30 / Math.max(1, r.frequence_jours || 1);
+  const estimation = Math.round(collectes * (r.dates.length + r.fiches_par_jour));
+  $("p-estimation").textContent = `Avec les réglages actuels : environ ${estimation} requêtes par mois (${r.dates.length} dates et ${r.fiches_par_jour} fiche${r.fiches_par_jour > 1 ? "s" : ""} détaillée${r.fiches_par_jour > 1 ? "s" : ""} par collecte).`;
   const b = d.budget;
   if (b) {
     const tient = b.besoin <= b.restantes - b.reserve;
@@ -676,7 +677,7 @@ function dessinerPilotage(d) {
       Besoin estimé d'ici la fin du mois (${b.joursRestants} jour${b.joursRestants > 1 ? "s" : ""}) : ${b.besoin} requêtes · restantes : ${b.restantes} (dont ${b.reserve} de réserve).
       ${tient ? "" : "<br>Le script réduit tout seul : d'abord les fiches détaillées, puis le nombre de dates. Le quota ne sera pas dépassé."}`;
   }
-  $("p-automatisme").textContent = `Collecte chaque jour vers ${r.heure} h${r.a_l_ouverture ? " et à l'ouverture du classeur" : ""} · fiches détaillées le ${r.jour_fiches}.`;
+  $("p-automatisme").textContent = `Collecte chaque jour vers ${r.heure} h${r.a_l_ouverture ? " et à l'ouverture du classeur" : ""} · ${r.fiches_par_jour} fiche${r.fiches_par_jour > 1 ? "s" : ""} détaillée${r.fiches_par_jour > 1 ? "s" : ""} (prix site par site) par collecte, à tour de rôle.`;
   $("p-hotels").innerHTML = r.hotels.map((h) => `<li>${echapper(h)}</li>`).join("") || "<li>aucun</li>";
   $("p-dates").innerHTML = r.dates.map((x) => `<li>${echapper(x.nom)} : ${dateLongue(x.arrivee)}</li>`).join("") || "<li>aucune date à venir</li>";
   $("lien-reglages").href = d.urlReglages;
@@ -720,7 +721,7 @@ async function lancer(demande) {
 $("b-collecte").addEventListener("click", () => {
   const u = etat.usage[etat.usage.length - 1];
   const reste = u && u.requetes_restantes !== "" ? ` Il vous en reste ${u.requetes_restantes} ce mois-ci.` : "";
-  if (confirm("Relancer une collecte complète maintenant ? Environ 4 requêtes SerpApi (12 le jour des fiches)." + reste)) lancer({ action: "collecte" });
+  if (confirm("Relancer une collecte complète maintenant ? Environ 6 requêtes SerpApi." + reste)) lancer({ action: "collecte" });
 });
 
 // ------------------------- Onglets et chargement -------------------------
