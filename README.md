@@ -53,7 +53,7 @@ Il va lire le vrai programme sur GitHub et prend tout seul chaque nouvelle versi
 
 ### 1. La clé SerpApi
 
-1. Créez un compte gratuit sur <https://serpapi.com/users/sign_up> (offre **Free** : 250 requêtes par mois ; le réglage de départ en utilise ~155).
+1. Créez un compte gratuit sur <https://serpapi.com/users/sign_up> (offre **Free** : 250 requêtes par mois ; le réglage de départ en utilise ~180).
 2. Copiez votre clé sur <https://serpapi.com/manage-api-key>.
 3. Dans le classeur, onglet **Réglages**, collez-la dans la cellule jaune **Clé SerpApi**
    (le script la rangera en lieu sûr et effacera la cellule).
@@ -107,7 +107,7 @@ Gardez l'adresse (elle finit par `/exec`) dans vos favoris, sur téléphone auss
 | Menu | Ce qu'il fait | Coût |
 |---|---|---|
 | Ouvrir le tableau de bord | Aperçu, évolution, comparaison, pilotage (voir plus bas) | gratuit |
-| Lancer la collecte maintenant | Collecte complète | ~4 requêtes (+8 le jour des fiches) |
+| Lancer la collecte maintenant | Collecte complète | ~6 requêtes |
 | Essai | 1 hôtel, 1 date, n'enregistre rien | 2 requêtes |
 | Collecte + fiches détaillées | Collecte complète + fiches de tous les hôtels | ~12 requêtes |
 | Enregistrer la clé SerpApi | Remplace la clé (ou collez-la dans Réglages) | gratuit |
@@ -119,8 +119,8 @@ Gardez l'adresse (elle finit par `/exec`) dans vos favoris, sur téléphone auss
 ## Le budget de requêtes
 
 - **Chaque jour** : 1 requête par date de séjour (elle donne les prix de **tous** les hôtels de Luchon pour cette date) → 4 dates × 30 jours = **120/mois**.
-- **Une fois par semaine** (lundi par défaut) : 1 fiche détaillée par hôtel (plus de sites, étoiles, restauration, petit-déjeuner inclus, notes détaillées) → 8 × ~4,3 = **~35/mois**.
-- **Total ≈ 155/mois** sur 250.
+- **Chaque jour, 2 fiches détaillées** (réglage « Fiches détaillées par jour ») : le prix **site par site** (Booking, Expedia, site de l'hôtel…), le petit-déjeuner inclus, les étoiles et les notes détaillées, pour un couple hôtel + date. Les hôtels et les dates passent **à tour de rôle** (le plus ancien d'abord) : avec 8 hôtels, chacun est détaillé tous les 4 jours environ → 2 × 30 = **60/mois**.
+- **Total ≈ 180/mois** sur 250.
 
 ### Que se passe-t-il si on dépasse 250 ?
 
@@ -141,7 +141,7 @@ Avant **chaque** collecte (automatique, à l'ouverture, bouton, menu ou essai), 
 Chaque décision est notée dans l'onglet **Journal** (lignes « Budget » et « Économie de requêtes »).
 L'onglet **Pilotage** du tableau de bord affiche le besoin estimé d'ici la fin du mois face aux requêtes restantes.
 
-Pour estimer un changement : **(dates × 30 ÷ fréquence) + (hôtels × 4,3)**.
+Pour estimer un changement : **(dates + fiches par jour) × 30 ÷ fréquence**.
 
 ---
 
@@ -152,7 +152,7 @@ Pour estimer un changement : **(dates × 30 ÷ fréquence) + (hôtels × 4,3)**.
   Un hôtel peut aussi être absent un jour parce qu'il est complet ou fermé.
 - **Retirer un hôtel** : effacez sa ligne (son historique reste dans les onglets de données).
 - **Dates de séjour** : une date d'arrivée par ligne, ou `+30` pour « dans 30 jours ». Une date passée est ignorée et signalée : remplacez-la. Gardez le même nom pour que les courbes continuent.
-- **Fréquence**, **jour des fiches**, **quota**, **réserve** : se lisent à chaque collecte.
+- **Fréquence**, **fiches détaillées par jour**, **quota**, **réserve** : se lisent à chaque collecte.
 - **Heure de la collecte** : après un changement, refaites **Activer l'automatisation**.
 
 ---
@@ -177,7 +177,8 @@ Si la collecte du jour n'est pas faite, il la lance et se met à jour tout seul.
 
 ## Bon à savoir
 
-- Google Hotels ne montre pas tous les sites pour tous les hôtels ; les fiches détaillées du lundi en montrent davantage.
+- La recherche quotidienne par ville ne donne qu'**un prix par hôtel** (« Google (prix le plus bas) ») : le détail **site par site** vient des fiches détaillées, faites à tour de rôle.
+- Un hôtel absent des premiers résultats de Google fait l'objet d'une **recherche ciblée** sur son nom (au plus une par collecte, une fois par semaine par hôtel). S'il reste introuvable, ajoutez dans « Autres noms » le nom exact affiché sur Google Hotels.
 - « Restaurant / petit-déjeuner » est déduit des équipements listés par Google : c'est une indication.
 - Une collecte prend environ une minute. Si deux collectes se croisent (ouverture + heure prévue), la seconde s'arrête aussitôt (« Une collecte est déjà en cours »).
 - Après un an ou deux, l'onglet Prix devient gros (plusieurs dizaines de milliers de lignes) : la page web peut ralentir. On pourra alors archiver les vieux relevés dans un autre classeur.
