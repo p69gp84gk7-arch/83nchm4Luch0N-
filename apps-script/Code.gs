@@ -161,6 +161,32 @@ function menuDesactiver() {
   SpreadsheetApp.getUi().alert("Automatisation désactivée. Le menu reste utilisable à la main.");
 }
 
+/** Supprime les déclencheurs d'anciennes versions dont la fonction n'existe plus. */
+function nettoyerDeclencheurs() {
+  try {
+    ScriptApp.getProjectTriggers()
+      .filter(d => !['collecteAutomatique', 'collecteALouverture'].includes(d.getHandlerFunction()))
+      .forEach(d => ScriptApp.deleteTrigger(d));
+  } catch (e) {
+    console.log('Nettoyage des déclencheurs impossible : ' + e.message);
+  }
+}
+
+/** Garde le compte rendu de chaque collecte dans l'onglet Journal (les plus récents en haut). */
+function noterJournal(message, detail) {
+  try {
+    const feuille = classeur().getSheetByName('Journal') || classeur().insertSheet('Journal');
+    if (feuille.getLastRow() === 0) {
+      feuille.getRange(1, 1, 1, 3).setValues([['Date', 'Résultat', 'Détail']]).setFontWeight('bold');
+      feuille.setFrozenRows(1);
+    }
+    feuille.insertRowAfter(1);
+    feuille.getRange(2, 1, 1, 3).setValues([[new Date(), message, String(detail || '').slice(0, 45000)]]);
+  } catch (e) {
+    console.log('Journal impossible : ' + e.message);
+  }
+}
+
 function supprimerDeclencheurs() {
   ScriptApp.getProjectTriggers()
     .filter(d => ['collecteAutomatique', 'collecteALouverture', 'miseAJourAutomatique'].includes(d.getHandlerFunction()))
@@ -236,6 +262,7 @@ function collecterDepuisPage(forcer) {
  * Renvoie { ok, faite (des lignes ont été enregistrées), message, journal }.
  */
 function collecter(options) {
+  nettoyerDeclencheurs();
   const verrou = LockService.getScriptLock();
   if (!verrou.tryLock(1000)) return { ok: false, faite: false, message: 'Une collecte est déjà en cours.', journal: '' };
   const journal = [];
@@ -247,6 +274,7 @@ function collecter(options) {
   }
   try {
     if (!(options || {}).essai) noterEtat(r.message);
+    noterJournal((options || {}).essai ? 'Essai : ' + r.message : r.message, r.journal);
     return r;
   } finally {
     verrou.releaseLock();
@@ -464,26 +492,30 @@ function rechercherVille(cfg, arrivee, depart, etat) {
 /** Met un nom d'hôtel sous une forme simple pour comparer : minuscules, sans accents, sans « hôtel »… */
 function simplifier(texte) {
   const inutiles = ['hotel', 'hotels', 'le', 'la', 'les', 'de', 'des', 'du', 'd', 'l', 'et', 'spa',
-                    'luchon', 'bagneres', 'the', 'and'];
+                    'luchon', 'bagneres', 'the', 'and', 'residence', 'residences'];
   return String(texte || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
     .replace(/[^a-z0-9]+/g, ' ').split(' ').filter(m => m && !inutiles.includes(m));
 }
 
-/** Note de 0 à 1 : à quel point deux noms d'hôtels se ressemblent. */
+/**
+ * Note de 0 à 1 : à quel point deux noms d'hôtels se ressemblent.
+ * On compare mot par mot (deux mots presque identiques comptent comme un seul, ex. « celeste » / « celestes »).
+ */
 function ressemblance(nomA, nomB) {
-  const a = simplifier(nomA), b = simplifier(nomB);
+  const a = [...new Set(simplifier(nomA))], b = [...new Set(simplifier(nomB))];
   if (!a.length || !b.length) return 0;
-  const ensA = new Set(a), ensB = new Set(b);
-  const communs = [...ensA].filter(m => ensB.has(m)).length;
-  const commun = communs / new Set(a.concat(b)).size;
-  // Ressemblance des lettres (paires de lettres en commun)
+  const communs = a.filter(m => b.some(n => motsProches(m, n))).length;
+  return communs / (a.length + b.length - communs);
+}
+
+function motsProches(a, b) {
+  if (a === b) return true;
+  if (Math.min(a.length, b.length) < 5) return false; // les mots courts doivent être identiques
   const paires = t => { const r = []; for (let i = 0; i < t.length - 1; i++) r.push(t.slice(i, i + 2)); return r; };
-  const pa = paires(a.join(' ')), pb = paires(b.join(' '));
+  const pa = paires(a), pb = paires(b).slice();
   let n = 0;
-  const reste = pb.slice();
-  pa.forEach(p => { const i = reste.indexOf(p); if (i >= 0) { n++; reste.splice(i, 1); } });
-  const proche = pa.length + pb.length ? (2 * n) / (pa.length + pb.length) : 0;
-  return Math.max(commun, proche);
+  pa.forEach(p => { const i = pb.indexOf(p); if (i >= 0) { n++; pb.splice(i, 1); } });
+  return (2 * n) / (pa.length + paires(b).length) >= 0.8;
 }
 
 /** Retrouve chaque hôtel des Réglages dans les résultats Google. Renvoie { nom: propriété }. */
@@ -648,7 +680,7 @@ function datesValides(cfg, journal) {
   cfg.dates.forEach(d => {
     const texte = String(d.arrivee).trim();
     let arrivee;
-    if (d.arrivee instanceof Date) arrivee = enIso(d.arrivee);
+    if (d.arrivee instanceof Date || (typeof d.arrivee === 'number' && d.arrivee > 1000)) arrivee = enIsoValeur(d.arrivee);
     else if (typeof d.arrivee === 'number') arrivee = decaler(auj, d.arrivee); // « +30 » tapé sans apostrophe
     else if (texte.startsWith('+')) arrivee = decaler(auj, parseInt(texte.slice(1), 10));
     else arrivee = texte;
@@ -667,6 +699,12 @@ function datesValides(cfg, journal) {
 
 function aujourdhui() { return Utilities.formatDate(new Date(), FUSEAU, 'yyyy-MM-dd'); }
 function enIso(date) { return Utilities.formatDate(date, FUSEAU, 'yyyy-MM-dd'); }
+/** Une valeur de cellule en AAAA-MM-JJ : vraie date, ou nombre de jours du tableur (cellule au format nombre). */
+function enIsoValeur(v) {
+  if (v instanceof Date) return enIso(v);
+  if (typeof v === 'number' && v > 1000) return Utilities.formatDate(new Date(Date.UTC(1899, 11, 30) + v * 86400000), 'UTC', 'yyyy-MM-dd');
+  return String(v);
+}
 function versDate(iso) { return Utilities.parseDate(iso, FUSEAU, 'yyyy-MM-dd'); }
 function decaler(iso, jours) {
   const [a, m, j] = iso.split('-').map(Number);
@@ -694,7 +732,7 @@ function lireObjets(cleOnglet) {
     .filter(l => l[0] !== '')
     .map(l => {
       const o = {};
-      colonnes.forEach((c, i) => { o[c] = l[i] instanceof Date ? enIso(l[i]) : l[i]; });
+      colonnes.forEach((c, i) => { o[c] = COLONNES_DATES.includes(c) ? enIsoValeur(l[i]) : l[i]; });
       return o;
     });
 }
@@ -717,6 +755,6 @@ function derniereCollecte() {
   const feuille = feuilleDonnees('prix');
   if (feuille.getLastRow() < 2) return '';
   const dates = feuille.getRange(2, 1, feuille.getLastRow() - 1, 1).getValues()
-    .map(l => l[0] instanceof Date ? enIso(l[0]) : String(l[0])).filter(Boolean);
+    .map(l => enIsoValeur(l[0])).filter(Boolean);
   return dates.length ? dates.sort().pop() : '';
 }
