@@ -184,8 +184,10 @@ Si la collecte du jour n'est pas faite, il la lance et se met à jour tout seul.
 - **Comparer** : choisissez 2 hôtels ou plus (ou cochez « Comparer » sur les cartes) pour voir leurs prix site par site et leurs offres.
 - **Carte** : la **zone de collecte** (un cercle autour de Luchon, réglable dans les Réglages : centre et rayon), les **hôtels suivis**
   (leur couleur ; clic = prix du séjour choisi, note, distance au centre, « hors zone ») et, en gris, les **autres établissements**
-  trouvés par Google au dernier relevé : les concurrents non suivis, avec leur prix et leur note. Les positions viennent de
-  Google Hotels, sans requête en plus (onglet **Établissements** du classeur).
+  trouvés par Google au dernier relevé (gris plein, avec prix et note) ainsi que **tous les hébergements de la zone connus
+  d'OpenStreetMap** (gris vide : hôtels, chambres d'hôtes, résidences…, même ceux que Google ne renvoie pas). Les positions viennent
+  de Google Hotels et d'OpenStreetMap, sans requête SerpApi en plus. Bouton **« Suivre cet hôtel »** dans la bulle : il est ajouté
+  aux Réglages (code d'accès demandé sur la page GitHub) et recherché sur Google Hotels à la prochaine collecte.
 - **Pilotage** : lancer une collecte, une collecte avec fiches détaillées ou un essai sur un hôtel ; compteur SerpApi et estimation mensuelle ;
   résumé des réglages (bouton « Modifier les réglages ») ; journal des dernières collectes, avec le détail hôtel par hôtel.
 

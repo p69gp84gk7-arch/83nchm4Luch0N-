@@ -192,6 +192,8 @@
   .legende-carte { display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.82rem; color: var(--texte-2); margin-top: 8px; }
   .legende-carte span { display: inline-flex; align-items: center; gap: 6px; }
   .rond { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--trait); }
+  .leaflet-popup-content .bouton { margin-top: 8px; min-height: 30px; padding: 4px 10px; font-size: 0.85rem; }
+  .source { font-size: 0.72rem; padding: 1px 6px; border-radius: 999px; background: var(--carte-2); color: var(--texte-3); margin-left: 4px; }
   .zone-echantillon { display: inline-block; width: 16px; height: 12px; border-radius: 3px; border: 2px solid var(--accent); background: var(--accent-fond); }
 
   #toast {
@@ -282,7 +284,8 @@
         <div class="legende-carte">
           <span><span class="zone-echantillon"></span>Zone de collecte</span>
           <span><span class="rond" style="background:var(--s1)"></span>Hôtel suivi (sa couleur)</span>
-          <span><span class="rond" style="background:#8a8984;width:9px;height:9px"></span>Autre établissement trouvé par Google</span>
+          <span><span class="rond" style="background:#8a8984;width:9px;height:9px"></span>Autre établissement trouvé par Google (avec prix)</span>
+          <span><span class="rond" style="background:transparent;border-color:#8a8984;width:9px;height:9px"></span>Hébergement connu d'OpenStreetMap</span>
         </div>
       </div>
       <div class="bloc" style="margin:0">
@@ -291,7 +294,7 @@
         <strong style="font-size:.9rem">Hôtels suivis</strong>
         <ul class="liste-carte" id="carte-suivis"></ul>
         <strong style="font-size:.9rem;display:block;margin-top:12px">Autres établissements</strong>
-        <p class="aide" style="margin:2px 0 0">Concurrents trouvés par Google au dernier relevé, non suivis. Pour en suivre un, ajoutez son nom dans les Réglages.</p>
+        <p class="aide" style="margin:2px 0 0">Hébergements de la zone non suivis : trouvés par Google au dernier relevé (avec prix) ou connus d'OpenStreetMap. Touchez-en un puis « Suivre cet hôtel » pour l'ajouter.</p>
         <ul class="liste-carte" id="carte-autres"></ul>
       </div>
     </div>
@@ -778,13 +781,66 @@ function distanceKm(a, b) {
 }
 const km = (d) => (d < 1 ? Math.round(d * 1000) + " m" : d.toFixed(1).replace(".", ",") + " km");
 
-// Position d'un hôtel suivi : sa dernière fiche, sinon le dernier relevé des établissements
-function positionHotel(h) {
+// Noms d'hôtels comparables (même principe que le programme du classeur)
+function motsDuNom(t) {
+  const inutiles = ["hotel", "hotels", "le", "la", "les", "de", "des", "du", "d", "l", "et", "spa", "luchon", "bagneres", "residence", "residences", "the", "and"];
+  return [...new Set(String(t || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").split(" ").filter((m) => m && !inutiles.includes(m)))];
+}
+function memeHotel(a, b) {
+  const x = motsDuNom(a), y = motsDuNom(b);
+  if (!x.length || !y.length) return false;
+  const communs = x.filter((m) => y.includes(m)).length;
+  return communs / (x.length + y.length - communs) >= 0.6;
+}
+
+// Tous les hébergements de la zone connus d'OpenStreetMap (gardés une semaine sur l'appareil)
+const TYPES_OSM = { hotel: "hôtel", guest_house: "chambres d'hôtes", motel: "motel", hostel: "auberge", apartment: "appartements", chalet: "chalet" };
+async function chargerOsm(z) {
+  const cle = `veille-luchon-osm-${z.latitude}-${z.longitude}-${z.rayon_km}`;
+  try {
+    const garde = JSON.parse(memoire(cle) || "null");
+    if (garde && Date.now() - garde.quand < 7 * 864e5) return garde.lieux;
+  } catch (e) {}
+  const requete = `[out:json][timeout:25];nwr["tourism"~"^(${Object.keys(TYPES_OSM).join("|")})$"](around:${Math.round(z.rayon_km * 1000 * 1.2)},${z.latitude},${z.longitude});out center tags;`;
+  for (const serveurOsm of ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter"]) {
+    try {
+      const r = await fetch(serveurOsm, { method: "POST", body: "data=" + encodeURIComponent(requete), headers: { "Content-Type": "application/x-www-form-urlencoded" } });
+      if (!r.ok) continue;
+      const lieux = (await r.json()).elements.map((e) => {
+        const c = e.center || e, t = e.tags || {};
+        return { nom: t.name || "", type: TYPES_OSM[t.tourism] || t.tourism, etoiles: t.stars || "", site: t.website || t["contact:website"] || "",
+          pos: [c.lat, c.lon] };
+      }).filter((l) => l.nom && l.pos[0] != null);
+      memoire(cle, JSON.stringify({ quand: Date.now(), lieux }));
+      return lieux;
+    } catch (e) { /* serveur suivant */ }
+  }
+  return [];
+}
+
+// Position d'un hôtel suivi : sa dernière fiche, sinon le dernier relevé des établissements, sinon OpenStreetMap
+function positionHotel(h, osm = []) {
   const f = etat.infos[h] || {};
   if (f.latitude !== "" && f.latitude != null && !isNaN(nombre(f.latitude))) return [nombre(f.latitude), nombre(f.longitude)];
   const e = etat.etablissements.find((x) => x.hotel_suivi === h);
-  return e ? [nombre(e.latitude), nombre(e.longitude)] : null;
+  if (e) return [nombre(e.latitude), nombre(e.longitude)];
+  const o = osm.find((l) => memeHotel(l.nom, h));
+  return o ? o.pos : null;
 }
+
+// Ajoute un hôtel aux « Hôtels suivis » des Réglages (code d'accès demandé sur la page GitHub)
+async function suivre(nom) {
+  if (!confirm(`Suivre « ${nom} » ? Il sera ajouté aux Réglages et recherché sur Google Hotels à la prochaine collecte.`)) return;
+  try {
+    const r = await serveur("collecterDepuisPage", { action: "suivre", nom });
+    toast(r.message);
+    if (r.faite) await charger();
+  } catch (e) { toast("Impossible : " + (e.message || e)); }
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-suivre]");
+  if (b) suivre(b.dataset.suivre);
+});
 
 async function dessinerCarte() {
   try { await chargerLeaflet(); } catch (e) { $("carte").innerHTML = `<p class="vide">${echapper(e.message)}</p>`; return; }
@@ -809,20 +865,30 @@ async function dessinerCarte() {
 
   const series = seriesSejour(etat.sejour);
   const points = [];
-  // Autres établissements (gris, plus petits, dessous)
-  const autres = etat.etablissements.filter((e) => !e.hotel_suivi).map((e) => ({ ...e, pos: [nombre(e.latitude), nombre(e.longitude)] }))
+  const osm = await chargerOsm(z);
+  const estSuivi = (nom) => etat.ordreHotels.some((h) => memeHotel(h, nom));
+  const boutonSuivre = (nom) => `<br><button type="button" class="bouton" data-suivre="${echapper(nom)}">Suivre cet hôtel</button>`;
+  // Autres établissements trouvés par Google (gris plein, avec prix)
+  const autres = etat.etablissements.filter((e) => !e.hotel_suivi && !estSuivi(e.nom)).map((e) => ({ ...e, source: "Google", pos: [nombre(e.latitude), nombre(e.longitude)] }))
     .filter((e) => !isNaN(e.pos[0]));
+  // Hébergements connus d'OpenStreetMap, ni suivis ni déjà trouvés par Google (gris vide)
+  osm.filter((l) => !estSuivi(l.nom) && !autres.some((e) => memeHotel(e.nom, l.nom)))
+    .forEach((l) => autres.push({ nom: l.nom, type: l.type, etoiles: l.etoiles, site: l.site, source: "OpenStreetMap", pos: l.pos, prix_nuit_eur: "", note_sur_10: "", nombre_avis: "" }));
   autres.forEach((e) => {
     e.distance = distanceKm(centre, e.pos);
-    points.push(e.pos);
-    L.circleMarker(e.pos, { radius: 6, color: css.getPropertyValue("--carte").trim(), weight: 2, fillColor: "#8a8984", fillOpacity: 0.9 })
-      .bindPopup(`<strong>${echapper(e.nom)}</strong><br>${e.type ? echapper(e.type) + " · " : ""}non suivi<br>
-        ${e.prix_nuit_eur !== "" ? "Dès " + euros(nombre(e.prix_nuit_eur)) + " / nuit (1re date)" : "Pas de prix"}
+    if (e.distance <= z.rayon_km * 1.5) points.push(e.pos);
+    const google = e.source === "Google";
+    L.circleMarker(e.pos, google
+      ? { radius: 6, color: css.getPropertyValue("--carte").trim(), weight: 2, fillColor: "#8a8984", fillOpacity: 0.9 }
+      : { radius: 6, color: "#8a8984", weight: 2, fillColor: css.getPropertyValue("--carte").trim(), fillOpacity: 0.8 })
+      .bindPopup(`<strong>${echapper(e.nom)}</strong><br>${e.type ? echapper(e.type) + " · " : ""}${e.etoiles ? echapper(e.etoiles) + "★ · " : ""}non suivi
+        ${google ? "<br>" + (e.prix_nuit_eur !== "" ? "Dès " + euros(nombre(e.prix_nuit_eur)) + " / nuit (1re date)" : "Pas de prix") : "<br>Pas trouvé par Google au dernier relevé"}
         ${e.note_sur_10 !== "" ? "<br>Note " + String(e.note_sur_10).replace(".", ",") + " /10" + (e.nombre_avis !== "" ? " (" + e.nombre_avis + " avis)" : "") : ""}
-        <br><span style="color:#75746f">${km(e.distance)} du centre</span>`).addTo(coucheCarte);
+        ${e.site ? `<br><a href="${echapper(e.site)}" target="_blank" rel="noopener">site web</a>` : ""}
+        <br><span style="color:#75746f">${km(e.distance)} du centre · source ${e.source}</span>${boutonSuivre(e.nom)}`).addTo(coucheCarte);
   });
   // Hôtels suivis (couleur de l'hôtel, au-dessus)
-  const suivis = etat.ordreHotels.map((h) => ({ h, pos: positionHotel(h) }));
+  const suivis = etat.ordreHotels.map((h) => ({ h, pos: positionHotel(h, osm) }));
   const marqueurs = {};
   suivis.filter((x) => x.pos).forEach(({ h, pos }) => {
     const s = series[h], n = noteSur10(h), d = distanceKm(centre, pos);
@@ -841,7 +907,7 @@ async function dessinerCarte() {
   // Listes
   const dansZone = (pos) => distanceKm(centre, pos) <= z.rayon_km;
   const connus = suivis.filter((x) => x.pos);
-  $("carte-resume").textContent = `Rayon de ${km(z.rayon_km)} · ${connus.filter((x) => dansZone(x.pos)).length} hôtel(s) suivi(s) et ${autres.filter((e) => dansZone(e.pos)).length} autre(s) établissement(s) dans la zone.`;
+  $("carte-resume").textContent = `Rayon de ${km(z.rayon_km)} · ${connus.filter((x) => dansZone(x.pos)).length} hôtel(s) suivi(s) et ${autres.filter((e) => dansZone(e.pos)).length} autre(s) hébergement(s) dans la zone${osm.length ? "" : " (OpenStreetMap injoignable pour l'instant)"}.`;
   $("carte-suivis").innerHTML = suivis.map(({ h, pos }) => {
     const s = series[h];
     const lieu = pos ? km(distanceKm(centre, pos)) + (dansZone(pos) ? "" : ` <span class="hors-zone">hors zone</span>`) : `<span class="discret">position inconnue pour l'instant</span>`;
@@ -849,10 +915,20 @@ async function dessinerCarte() {
       <span class="droite">${s ? euros(s.dernier.prix) : "—"}</span></li>`;
   }).join("");
   const autresTries = autres.filter((e) => dansZone(e.pos)).sort((a, b) => a.distance - b.distance);
-  $("carte-autres").innerHTML = autresTries.length ? autresTries.map((e) =>
-    `<li><span class="puce" style="background:#8a8984"></span><span>${echapper(e.nom)}<br><span class="discret">${km(e.distance)}${e.note_sur_10 !== "" ? " · " + String(e.note_sur_10).replace(".", ",") + "/10" : ""}</span></span>
+  const marqueursAutres = [];
+  coucheCarte.eachLayer((c) => { if (c.getPopup && c.getPopup() && !Object.values(marqueurs).includes(c)) marqueursAutres.push(c); });
+  $("carte-autres").innerHTML = autresTries.length ? autresTries.map((e, i) =>
+    `<li data-autre="${i}"><span class="puce" style="background:${e.source === "Google" ? "#8a8984" : "transparent"};border:2px solid #8a8984"></span><span>${echapper(e.nom)}<span class="source">${e.source === "Google" ? "Google" : "OSM"}</span><br>
+      <span class="discret">${km(e.distance)}${e.type ? " · " + echapper(e.type) : ""}${e.note_sur_10 !== "" ? " · " + String(e.note_sur_10).replace(".", ",") + "/10" : ""}</span></span>
       <span class="droite">${e.prix_nuit_eur !== "" ? euros(nombre(e.prix_nuit_eur)) : "—"}</span></li>`).join("")
-    : `<li class="discret" style="cursor:default">Aucun pour l'instant : la liste se remplit à la prochaine collecte.</li>`;
+    : `<li class="discret" style="cursor:default">Aucun pour l'instant.</li>`;
+  $("carte-autres").onclick = (ev) => {
+    const li = ev.target.closest("[data-autre]");
+    if (!li) return;
+    const e = autresTries[Number(li.dataset.autre)];
+    const m = marqueursAutres.find((c) => c.getLatLng().lat === e.pos[0] && c.getLatLng().lng === e.pos[1]);
+    if (m) { carte.setView(m.getLatLng(), 16); m.openPopup(); }
+  };
   $("carte-suivis").onclick = (ev) => {
     const li = ev.target.closest("[data-hotel]");
     if (li && marqueurs[li.dataset.hotel]) { carte.setView(marqueurs[li.dataset.hotel].getLatLng(), 16); marqueurs[li.dataset.hotel].openPopup(); }

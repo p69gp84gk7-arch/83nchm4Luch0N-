@@ -27,7 +27,7 @@ const URL_COMPTE = 'https://serpapi.com/account.json'; // consulter son compte n
 // La page (index.html, aussi publiée sur GitHub Pages) est lue sur GitHub, comme le programme
 const URL_PAGE = 'https://raw.githubusercontent.com/p69gp84gk7-arch/83nchm4Luch0N-/main/index.html';
 // Actions de la page web qui consomment des requêtes : elles demandent le code d'accès des Réglages
-const ACTIONS_PROTEGEES = ['collecte', 'essai', 'fiches'];
+const ACTIONS_PROTEGEES = ['collecte', 'essai', 'fiches', 'suivre'];
 
 // Onglets de données et leurs colonnes (l'ordre compte, l'onglet Synthèse s'en sert)
 const ONGLETS = {
@@ -317,6 +317,25 @@ function lireDonnees() {
   };
 }
 
+/** Ajoute un hôtel à la liste « Hôtels suivis » des Réglages (depuis la carte). */
+function suivreHotel(nom) {
+  nom = String(nom || '').replace(/^[=+\-@\s]+/, '').trim().slice(0, 80);
+  if (!/^[\p{L}\d][\p{L}\d\s'’&.,\-]*$/u.test(nom)) {
+    return { ok: false, faite: false, message: 'Nom refusé : lettres, chiffres, espaces et « \' & . , - » seulement.', journal: '' };
+  }
+  const deja = lireReglages().hotels.find(h => ressemblance(h.nom, nom) >= 0.8);
+  if (deja) return { ok: true, faite: false, message: '« ' + deja.nom + ' » est déjà suivi.', journal: '' };
+  const feuille = classeur().getSheetByName('Réglages');
+  const colonneA = feuille.getRange(1, 1, feuille.getLastRow() + 1, 1).getValues().map(l => String(l[0]).trim());
+  const titre = colonneA.indexOf('Hôtels suivis');
+  if (titre < 0) return { ok: false, faite: false, message: 'Liste « Hôtels suivis » introuvable dans les Réglages.', journal: '' };
+  let ligne = titre + 2; // la ligne d'en-têtes est juste sous le titre
+  while (ligne < colonneA.length && colonneA[ligne]) ligne++;
+  feuille.getRange(ligne + 1, 1).setValue(nom);
+  return { ok: true, faite: true, journal: '',
+    message: '« ' + nom + ' » ajouté aux hôtels suivis : il sera recherché sur Google Hotels à la prochaine collecte.' };
+}
+
 function valeurReglage(libelle) {
   const cellule = celluleReglage(libelle);
   return cellule ? String(cellule.getDisplayValue()) : '';
@@ -338,13 +357,14 @@ function etatCollecte() {
 
 /**
  * Actions du tableau de bord. Le chargeur ne transmet qu'un argument : soit vrai/faux (forcer la collecte),
- * soit une demande { action: 'collecte' | 'auto' | 'essai' | 'fiches', hotel }.
+ * soit une demande { action: 'collecte' | 'auto' | 'essai' | 'fiches', hotel } ou { action: 'suivre', nom }.
  */
 function collecterDepuisPage(demande) {
   if (demande && typeof demande === 'object') {
     if (demande.action === 'essai') return collecter({ essai: true, hotel: String(demande.hotel || '').trim() });
     if (demande.action === 'fiches') return collecter({ forcer: true, fiches: true });
     if (demande.action === 'auto') return collecter({}); // ouverture du tableau de bord : respecte la fréquence
+    if (demande.action === 'suivre') return suivreHotel(demande.nom);
     return collecter({ forcer: true });
   }
   return collecter({ forcer: !!demande });
