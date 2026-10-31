@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Veille hôtels Luchon</title>
+<meta name="description" content="Prix, notes et restauration des hôtels de Bagnères-de-Luchon, relevés chaque jour.">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
   /* ---------- Couleurs (clair / sombre) ---------- */
@@ -300,6 +301,18 @@
     </div>
   </section>
 
+  <section id="relier" class="bloc" hidden>
+    <h2>Relier la page au classeur</h2>
+    <p class="aide">Cette page lit les données du classeur Google Sheets grâce à son « application Web ».
+      Dans Apps Script : <em>Déployer → Nouveau déploiement → Application Web</em>, « Exécuter en tant que » : <strong>Moi</strong>,
+      « Qui a accès » : <strong>Tout le monde</strong>, puis copiez l'adresse (elle finit par <code>/exec</code>) et collez-la ici.</p>
+    <div class="outils">
+      <label style="flex:1;min-width:240px">Adresse de l'application Web
+        <input type="text" id="adresse-api" placeholder="https://script.google.com/macros/s/…/exec"></label>
+      <button type="button" class="bouton principal" id="b-relier">Relier</button>
+    </div>
+  </section>
+
   <section id="vide" class="bloc" hidden>
     <h2>Pas encore de prix</h2>
     <p class="aide" style="margin:0">Aucune collecte n'a encore enregistré de prix. Cliquez « Relancer la collecte » en haut à droite :
@@ -325,10 +338,52 @@ const dateCourte = (iso) => (iso ? new Date(iso + "T12:00:00").toLocaleDateStrin
 const echapper = (t) => String(t ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const pourcent = (v) => (v > 0 ? "▲ +" : v < 0 ? "▼ " : "") + Math.abs(v).toFixed(1).replace(".", ",") + " %";
 
-// Appelle une fonction du script du classeur et renvoie une promesse
-function serveur(fonction, ...args) {
-  return new Promise((ok, ko) => google.script.run.withSuccessHandler(ok).withFailureHandler(ko)[fonction](...args));
+// Adresse de l'application Web Apps Script (Déployer › Application Web › « Tout le monde »).
+// Elle relie la page publiée sur GitHub Pages au classeur ; inutile quand la page s'ouvre dans le classeur.
+const URL_API = "";
+
+const dansLeClasseur = () => !!(window.google && google.script && google.script.run);
+function memoire(cle, valeur) {
+  try {
+    if (valeur === undefined) return localStorage.getItem(cle) || "";
+    valeur ? localStorage.setItem(cle, valeur) : localStorage.removeItem(cle);
+  } catch (e) { return ""; }
 }
+const urlApi = () => URL_API || memoire("veille-luchon-api");
+
+// Appelle une fonction du script du classeur et renvoie une promesse :
+// directement dans le classeur, sinon par l'application Web (page GitHub Pages)
+function serveur(fonction, ...args) {
+  if (dansLeClasseur()) {
+    return new Promise((ok, ko) => google.script.run.withSuccessHandler(ok).withFailureHandler(ko)[fonction](...args));
+  }
+  return appelApi(fonction, args[0], false);
+}
+
+async function appelApi(fonction, argument, nouvelEssai) {
+  if (!urlApi()) throw new Error("page pas encore reliée au classeur");
+  const url = urlApi() + "?api=" + encodeURIComponent(fonction)
+    + (argument === undefined ? "" : "&arg=" + encodeURIComponent(JSON.stringify(argument)))
+    + "&code=" + encodeURIComponent(memoire("veille-luchon-code"));
+  const r = await fetch(url);
+  if (!r.ok) throw new Error("le classeur répond " + r.status);
+  const d = await r.json();
+  if (d.erreur) throw new Error(d.erreur);
+  if (d.codeRefuse && nouvelEssai) memoire("veille-luchon-code", ""); // code faux : on l'oublie
+  if (d.codeRefuse && !nouvelEssai) {
+    // Les collectes demandées depuis cette page consomment des requêtes : il faut le code d'accès
+    const code = prompt("Code d'accès de la page web (onglet Réglages du classeur) :");
+    if (code) { memoire("veille-luchon-code", code.trim()); return appelApi(fonction, argument, true); }
+  }
+  return d;
+}
+
+$("b-relier").addEventListener("click", () => {
+  const adresse = $("adresse-api").value.trim();
+  if (!/^https:\/\/script\.google\.com\/.+\/exec$/.test(adresse)) { toast("L'adresse doit commencer par https://script.google.com/ et finir par /exec"); return; }
+  memoire("veille-luchon-api", adresse);
+  location.reload();
+});
 
 function toast(texte) {
   const t = $("toast");
@@ -765,6 +820,15 @@ async function charger() {
 
 async function demarrer() {
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", toutDessiner);
+  if (!dansLeClasseur() && !urlApi()) {
+    // Page GitHub Pages pas encore reliée au classeur
+    document.querySelectorAll(".sejours, .onglets, section").forEach((el) => (el.hidden = el.id !== "relier"));
+    $("relier").hidden = false;
+    $("sous-titre").textContent = "Page pas encore reliée au classeur";
+    pastille("En attente de l'adresse du classeur");
+    $("b-collecte").hidden = true;
+    return;
+  }
   try {
     const d = await charger();
     const e = d.etat;
