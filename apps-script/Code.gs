@@ -16,12 +16,23 @@
  *  INSTALLATION : exécutez une fois la fonction « installer » (bouton
  *  Exécuter de l'éditeur). Elle enregistre la clé, programme les collectes
  *  et lance la première.
+ *
+ *  MISES À JOUR : chaque jour, le script compare son code à celui de la
+ *  branche main du dépôt GitHub et se met à jour tout seul (il faut avoir
+ *  activé l'API Apps Script sur https://script.google.com/home/usersettings).
  * =====================================================================
  */
 
 // Le classeur où tout est enregistré (utile quand le script n'est pas attaché au classeur)
 const ID_CLASSEUR = '1LfKdFtpxfyKQj4uiVwkyoXF3FMzfAx1yxvDGMyabLZY';
 const FUSEAU = 'Europe/Paris';
+// Fichiers du script publiés sur GitHub (branche main) : source des mises à jour automatiques
+const DEPOT_BRUT = 'https://raw.githubusercontent.com/p69gp84gk7-arch/83nchm4Luch0N-/main/apps-script/';
+const FICHIERS_DEPOT = [
+  { nom: 'appsscript', type: 'JSON', fichier: 'appsscript.json' },
+  { nom: 'Code', type: 'SERVER_JS', fichier: 'Code.gs' },
+  { nom: 'Page', type: 'HTML', fichier: 'Page.html' },
+];
 const URL_RECHERCHE = 'https://serpapi.com/search.json';
 const URL_COMPTE = 'https://serpapi.com/account.json'; // consulter son compte ne coûte rien
 
@@ -67,8 +78,9 @@ function installer() {
     throw new Error(message);
   }
   const auto = programmerCollectes();
+  const maj = miseAJourAutomatique();
   const r = collecter({ forcer: true });
-  console.log(auto + '\n\n' + r.message + '\n' + r.journal);
+  console.log(auto + '\n\nMise à jour du script : ' + maj + '\n\n' + r.message + '\n' + r.journal);
   return r.message;
 }
 
@@ -81,9 +93,13 @@ function programmerCollectes() {
   if (cfg.a_l_ouverture) {
     ScriptApp.newTrigger('collecteALouverture').forSpreadsheet(ID_CLASSEUR).onOpen().create();
   }
+  // Mise à jour du script une heure avant la collecte
+  ScriptApp.newTrigger('miseAJourAutomatique').timeBased()
+    .everyDays(1).atHour((cfg.heure + 23) % 24).inTimezone(FUSEAU).create();
   return 'Automatisation activée :\n'
     + '- collecte chaque jour vers ' + cfg.heure + ' h (heure de Paris)\n'
     + (cfg.a_l_ouverture ? "- et à l'ouverture du classeur si celle du jour n'est pas encore faite\n" : '')
+    + '- mise à jour du script depuis GitHub chaque jour, une heure avant\n'
     + '\nUne seule collecte par jour : rouvrir le classeur ne coûte rien de plus.';
 }
 
@@ -98,8 +114,8 @@ function rangerCleDesReglages() {
 }
 
 /** Écrit l'état de la dernière collecte dans les Réglages, pour le voir sans ouvrir le script. */
-function noterEtat(message) {
-  const cellule = celluleReglage('Dernière collecte');
+function noterEtat(message, libelle) {
+  const cellule = celluleReglage(libelle || 'Dernière collecte');
   if (cellule) cellule.setValue(Utilities.formatDate(new Date(), FUSEAU, 'dd/MM/yyyy HH:mm') + ' : ' + message);
 }
 
@@ -110,6 +126,64 @@ function celluleReglage(libelle) {
   const libelles = feuille.getRange(1, 1, feuille.getLastRow(), 1).getValues();
   const i = libelles.findIndex(l => String(l[0]).trim() === libelle);
   return i < 0 ? null : feuille.getRange(i + 1, 2);
+}
+
+
+// =====================================================================
+//  Mise à jour automatique du script depuis GitHub
+//  Après la fusion d'une pull request, le nouveau code arrive tout seul.
+// =====================================================================
+
+/** Lancé chaque jour (et par le menu) : met le script à jour si GitHub a changé. Renvoie le résultat en texte. */
+function miseAJourAutomatique() {
+  let resultat;
+  try {
+    resultat = mettreAJourScript();
+  } catch (e) {
+    resultat = 'impossible : ' + e.message;
+  }
+  noterEtat(resultat, 'Mise à jour du script');
+  console.log('Mise à jour du script : ' + resultat);
+  return resultat;
+}
+
+function mettreAJourScript() {
+  const url = 'https://script.googleapis.com/v1/projects/' + ScriptApp.getScriptId() + '/content';
+  const entetes = { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() };
+  // 1) Le code publié sur GitHub
+  const nouveaux = FICHIERS_DEPOT.map(f => {
+    const r = UrlFetchApp.fetch(DEPOT_BRUT + f.fichier, { muteHttpExceptions: true });
+    if (r.getResponseCode() !== 200) throw new Error('fichier ' + f.fichier + ' introuvable sur GitHub (' + r.getResponseCode() + ')');
+    return { name: f.nom, type: f.type, source: r.getContentText() };
+  });
+  // 2) Le code actuel du script
+  const actuel = UrlFetchApp.fetch(url, { headers: entetes, muteHttpExceptions: true });
+  if (actuel.getResponseCode() !== 200) throw new Error(erreurApi(actuel));
+  const fichiers = JSON.parse(actuel.getContentText()).files || [];
+  const anciens = {};
+  fichiers.forEach(f => { anciens[f.name] = f.source; });
+  const changes = nouveaux.filter(f => anciens[f.name] !== f.source).map(f => f.name);
+  if (!changes.length) return 'déjà à jour';
+  // 3) Remplacement (les autres fichiers éventuels du projet sont gardés)
+  const autres = fichiers.filter(f => !nouveaux.some(n => n.name === f.name))
+    .map(f => ({ name: f.name, type: f.type, source: f.source }));
+  const envoi = UrlFetchApp.fetch(url, {
+    method: 'put', contentType: 'application/json', headers: entetes, muteHttpExceptions: true,
+    payload: JSON.stringify({ files: nouveaux.concat(autres) }),
+  });
+  if (envoi.getResponseCode() !== 200) throw new Error(erreurApi(envoi));
+  return 'nouvelle version installée (' + changes.join(', ') + ')';
+}
+
+function erreurApi(reponse) {
+  const texte = reponse.getContentText();
+  if (texte.includes('usersettings') || texte.includes('has not enabled')) {
+    return "activez l'API Apps Script sur https://script.google.com/home/usersettings";
+  }
+  if (reponse.getResponseCode() === 403) {
+    return "autorisation manquante : dans l'éditeur Apps Script, exécutez « installer » et acceptez";
+  }
+  return 'réponse ' + reponse.getResponseCode() + ' de Google';
 }
 
 
@@ -128,6 +202,7 @@ function onOpen() {
     .addSeparator()
     .addItem("Activer l'automatisation", 'menuActiver')
     .addItem("Désactiver l'automatisation", 'menuDesactiver')
+    .addItem('Mettre à jour le script depuis GitHub', 'menuMiseAJour')
     .addToUi();
 }
 
@@ -168,6 +243,11 @@ function menuActiver() {
   SpreadsheetApp.getUi().alert(programmerCollectes());
 }
 
+function menuMiseAJour() {
+  SpreadsheetApp.getUi().alert('Mise à jour du script : ' + miseAJourAutomatique()
+    + '\n\nRechargez le classeur pour utiliser la nouvelle version.');
+}
+
 function menuDesactiver() {
   supprimerDeclencheurs();
   SpreadsheetApp.getUi().alert("Automatisation désactivée. Le menu reste utilisable à la main.");
@@ -175,7 +255,7 @@ function menuDesactiver() {
 
 function supprimerDeclencheurs() {
   ScriptApp.getProjectTriggers()
-    .filter(d => ['collecteAutomatique', 'collecteALouverture'].includes(d.getHandlerFunction()))
+    .filter(d => ['collecteAutomatique', 'collecteALouverture', 'miseAJourAutomatique'].includes(d.getHandlerFunction()))
     .forEach(d => ScriptApp.deleteTrigger(d));
 }
 

@@ -26,8 +26,9 @@ SerpApi les récupère pour nous : c'est la **seule** clé de l'outil, et elle s
 |---|---|
 | `apps-script/Code.gs` | Le script du classeur : menu, collecte, automatisation, page web |
 | `apps-script/Page.html` | La page web (graphique, tableau, comparateur) |
+| `apps-script/appsscript.json` | Les réglages du projet Apps Script (fuseau horaire, autorisations) |
 
-Le dépôt sert à garder le code et son historique. Ce qui tourne vraiment, c'est la copie collée dans le classeur.
+Le dépôt garde le code et son historique. Le script du classeur se met à jour tout seul à partir de la branche `main`.
 
 ---
 
@@ -42,48 +43,73 @@ Le dépôt sert à garder le code et son historique. Ce qui tourne vraiment, c'e
 
 ---
 
-## Installation : 3 gestes (environ 5 minutes)
+## Installation (une seule fois, environ 10 minutes)
 
 Le classeur est déjà prêt (onglets, réglages, synthèse). Google ne permet à personne d'autre que vous
-d'installer un script dans votre compte : ces 3 gestes sont le minimum.
+d'installer un script dans votre compte : ces étapes sont le minimum, et **elles ne sont à faire qu'une fois**.
+Ensuite, chaque nouvelle version du script arrive toute seule (voir « Les mises à jour »).
 
-### 1. Créer le compte SerpApi et coller la clé
+### 1. La clé SerpApi
 
 1. Créez un compte gratuit sur <https://serpapi.com/users/sign_up> (offre **Free** : 250 requêtes par mois ; le réglage de départ en utilise ~155).
 2. Copiez votre clé sur <https://serpapi.com/manage-api-key>.
-3. Dans le classeur, onglet **Réglages**, collez-la dans la cellule jaune **Clé SerpApi**.
-   (Le script la rangera en lieu sûr et effacera la cellule.)
+3. Dans le classeur, onglet **Réglages**, collez-la dans la cellule jaune **Clé SerpApi**
+   (le script la rangera en lieu sûr et effacera la cellule).
 
-### 2. Coller le script
+### 2. Autoriser les mises à jour automatiques
 
-1. Ouvrez <https://raw.githubusercontent.com/p69gp84gk7-arch/83nchm4Luch0N-/main/apps-script/Code.gs>, sélectionnez tout (Ctrl+A ou Cmd+A) et copiez.
-2. Dans le classeur : menu **Extensions → Apps Script**.
-3. Dans `Code.gs` : effacez tout, collez, puis **enregistrez** (icône disquette).
+Ouvrez <https://script.google.com/home/usersettings> et mettez **API Google Apps Script** sur **Activé**.
 
-### 3. Cliquer sur « Exécuter »
+### 3. Coller le script (la seule fois)
 
-1. En haut de l'éditeur, dans la liste des fonctions, choisissez **installer**, puis cliquez **Exécuter**.
+1. Dans le classeur : menu **Extensions → Apps Script**.
+2. **Le code** : ouvrez <https://raw.githubusercontent.com/p69gp84gk7-arch/83nchm4Luch0N-/main/apps-script/Code.gs>,
+   sélectionnez tout, copiez ; dans `Code.gs`, effacez tout et collez.
+3. **Le fichier de réglages** : à gauche, roue dentée **Paramètres du projet** → cochez
+   **Afficher le fichier manifeste « appsscript.json » dans l'éditeur**. Revenez à l'éditeur (icône `< >`),
+   ouvrez `appsscript.json`, effacez tout et collez le contenu de
+   <https://raw.githubusercontent.com/p69gp84gk7-arch/83nchm4Luch0N-/main/apps-script/appsscript.json>.
+4. **Enregistrez** (icône disquette).
+
+### 4. Cliquer sur « Exécuter »
+
+1. En haut de l'éditeur, choisissez la fonction **installer**, puis **Exécuter**.
 2. Google demande d'autoriser le script (comme pour vos autres scripts) :
    **Examiner les autorisations → votre compte → Paramètres avancés → Accéder à … (non sécurisé) → Autoriser**.
-3. En une minute, le script :
-   - range la clé et la vérifie ;
-   - programme la collecte **chaque jour** (7 h) et **à l'ouverture du classeur** si celle du jour n'est pas faite ;
-   - lance la **première collecte** : les onglets Prix, Avis, Hôtels et la Synthèse se remplissent.
+3. En une minute, le script range la clé, programme la collecte **chaque jour** (7 h) et **à l'ouverture du classeur**,
+   programme sa propre **mise à jour quotidienne**, puis lance la **première collecte**.
 
-Le résultat s'affiche dans le journal en bas de l'éditeur et dans la case **Dernière collecte** des Réglages.
-C'est fini : plus rien à faire. Rechargez le classeur pour voir aussi le menu **Veille hôtels**.
+Les cases **Dernière collecte** et **Mise à jour du script** des Réglages montrent le résultat. Rechargez le classeur pour voir le menu **Veille hôtels**.
+
+---
+
+## Les mises à jour
+
+Vous n'avez plus jamais à copier-coller de code :
+
+1. Je propose une modification dans une **pull request** sur GitHub.
+2. Vous la relisez et cliquez **Merge** : c'est votre feu vert.
+3. Le lendemain (une heure avant la collecte), le script compare son code à celui de GitHub et **se met à jour tout seul**.
+   Pour ne pas attendre : menu **Veille hôtels → Mettre à jour le script depuis GitHub**.
+
+La case **Mise à jour du script** des Réglages indique la date et le résultat (« déjà à jour », « nouvelle version installée »…).
+
+**Seule chose à faire de votre côté, et seulement si vous utilisez la page web** : la redéployer (voir ci-dessous).
+Si une nouvelle version demande une autorisation supplémentaire, la case l'indiquera : exécutez à nouveau **installer** dans l'éditeur.
+
+---
 
 ### (Facultatif) La page web avec graphique et comparateur
 
-1. Dans l'éditeur Apps Script : **+** → **HTML**, nommez-le exactement `Page`, collez le contenu de
-   <https://raw.githubusercontent.com/p69gp84gk7-arch/83nchm4Luch0N-/main/apps-script/Page.html>, enregistrez.
-2. **Déployer → Nouveau déploiement** → type **Application Web** → « Exécuter en tant que » : **Moi**,
+1. Le fichier `Page` arrive tout seul avec la première mise à jour (ou menu **Veille hôtels → Mettre à jour le script depuis GitHub**).
+2. Dans l'éditeur Apps Script : **Déployer → Nouveau déploiement** → type **Application Web** → « Exécuter en tant que » : **Moi**,
    « Qui a accès » : **Moi uniquement** → **Déployer**. Gardez l'adresse (elle finit par `/exec`) dans vos favoris.
 
 À l'ouverture, la page lance la collecte du jour si elle n'est pas faite, puis se met à jour toute seule.
 
-> Après une modification du script, la page garde l'ancienne version tant que vous n'avez pas fait
-> **Déployer → Gérer les déploiements → ✏️ → Version : Nouvelle version → Déployer**.
+> **Après chaque mise à jour du script**, la page garde l'ancienne version tant que vous n'avez pas fait
+> **Déployer → Gérer les déploiements → ✏️ → Version : Nouvelle version → Déployer** (l'adresse ne change pas).
+> Le menu, les collectes et le classeur, eux, utilisent tout de suite la nouvelle version.
 
 ---
 
@@ -96,7 +122,8 @@ C'est fini : plus rien à faire. Rechargez le classeur pour voir aussi le menu *
 | Collecte + fiches détaillées | Collecte complète + fiches de tous les hôtels | ~12 requêtes |
 | Voir le compteur SerpApi | Requêtes utilisées et restantes ce mois-ci | gratuit |
 | Enregistrer la clé SerpApi | Remplace la clé (ou collez-la dans Réglages) | gratuit |
-| Activer / Désactiver l'automatisation | Collecte quotidienne et à l'ouverture | — |
+| Activer / Désactiver l'automatisation | Collecte quotidienne, à l'ouverture, et mise à jour du script | — |
+| Mettre à jour le script depuis GitHub | Installe tout de suite la dernière version | gratuit |
 
 ---
 
