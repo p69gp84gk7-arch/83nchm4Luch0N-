@@ -1,245 +1,172 @@
 # Veille hôtels — Bagnères-de-Luchon
 
-Chaque jour, un petit robot va chercher sur **Google Hotels** (par l'intermédiaire du service **SerpApi**) :
+Un classeur **Google Sheets** avec un script **Apps Script** qui, chaque jour, va chercher sur **Google Hotels** (via le service **SerpApi**) :
 
 - le **prix par nuit** de chaque hôtel, **site par site** (Booking, Expedia, site de l'hôtel…), pour quelques dates de séjour ;
 - la **note clients** et le **nombre d'avis** ;
 - les infos de **restauration** (restaurant sur place, petit-déjeuner).
 
-Il range tout dans des fichiers tableur (CSV) du dossier `data/`, et une **page web** affiche un graphique, un tableau comparatif et un comparateur.
+Tout est enregistré dans le classeur, qui sert de base de données. Une **page web** (facultative) affiche un graphique, un tableau comparatif et un comparateur.
+
+Le classeur : **Veille hôtels Luchon – base de données**, dans votre Google Drive.
 
 ---
 
-## Comment ça marche (en 5 lignes)
+## Pourquoi une clé SerpApi ?
 
-1. `config.yaml` : la liste des hôtels, des dates de séjour, la fréquence. **C'est le seul fichier à modifier.**
-2. `collecte.py` : le programme qui interroge SerpApi et ajoute des lignes aux fichiers de `data/`.
-3. `.github/workflows/collecte.yml` : le « réveil » de GitHub (GitHub Actions) qui lance le programme chaque matin, gratuitement.
-4. `data/*.csv` : l'historique. On ajoute des lignes, on n'efface jamais rien.
-5. `index.html` : la page web, publiée gratuitement par GitHub Pages, qui lit les fichiers de `data/`.
+Vos autres scripts Apps Script travaillent sur **vos** données Google (classeurs, Gmail, Agenda) : pas besoin de clé.
+Les prix de Booking, Expedia ou Google Hotels ne sont pas vos données, et Google ne les donne pas à Apps Script.
+SerpApi les récupère pour nous : c'est la **seule** clé de l'outil, et elle se colle une seule fois dans le menu du classeur.
 
 ---
 
-## Installation pas à pas
+## Ce que contient ce dépôt
 
-### Étape 1 — Créer un compte SerpApi (gratuit)
+| Fichier | Rôle |
+|---|---|
+| `apps-script/Code.gs` | Le script du classeur : menu, collecte, automatisation, page web |
+| `apps-script/Page.html` | La page web (graphique, tableau, comparateur) |
+| `apps-script/appsscript.json` | Les réglages du projet Apps Script (fuseau horaire, autorisations) |
 
-1. Allez sur <https://serpapi.com/users/sign_up> et créez un compte (offre **Free**).
-2. Une fois connecté, ouvrez <https://serpapi.com/manage-api-key> et **copiez votre clé API** (une longue suite de lettres et de chiffres).
-3. **Ne collez jamais cette clé dans un fichier du dépôt.** Elle va uniquement dans les « secrets » GitHub (étape 2).
+Le dépôt garde le code et son historique. Le script du classeur se met à jour tout seul à partir de la branche `main`.
 
-> **Offre gratuite (vérifiée en octobre 2026)** : 250 requêtes par mois, 50 par heure maximum.
-> Seules les recherches réussies comptent. Le réglage par défaut en utilise **environ 155 par mois** (voir « Le budget de requêtes » plus bas).
+---
 
-### Étape 2 — Mettre la clé dans les secrets GitHub
+## Le classeur
 
-Un « secret » GitHub est un coffre-fort : le robot peut lire la clé, mais personne ne la voit dans le code.
+| Onglet | Contenu |
+|---|---|
+| **Synthèse** | Une ligne par hôtel : étoiles, dernier prix, site le moins cher, prix le plus bas et sa date, évolution, note sur 10, avis, restauration. Choisissez le séjour dans la cellule jaune. |
+| **Réglages** | Hôtels suivis, dates de séjour, fréquence, heure, quota. **C'est le seul onglet à modifier.** |
+| **Prix**, **Avis**, **Hôtels**, **Compteur** | Les relevés bruts, ajoutés par le script à chaque collecte. Rien n'est jamais effacé. |
+| **Sources** | D'où viennent les données. |
 
-1. Sur la page de votre dépôt GitHub : **Settings** (Paramètres) → **Secrets and variables** → **Actions**.
-2. Cliquez **New repository secret**.
-3. **Name** : `SERPAPI_KEY` (exactement, en majuscules). **Secret** : collez votre clé. Cliquez **Add secret**.
+---
 
-### Étape 3 — Autoriser le robot à enregistrer les données
+## Installation (une seule fois, environ 10 minutes)
 
-1. **Settings** → **Actions** → **General**.
-2. Tout en bas, « Workflow permissions » : cochez **Read and write permissions**, puis **Save**.
+Le classeur est déjà prêt (onglets, réglages, synthèse). Google ne permet à personne d'autre que vous
+d'installer un script dans votre compte : ces étapes sont le minimum, et **elles ne sont à faire qu'une fois**.
+Ensuite, chaque nouvelle version du script arrive toute seule (voir « Les mises à jour »).
 
-### Étape 4 — Publier la page web (GitHub Pages)
+### 1. La clé SerpApi
 
-1. **Settings** → **Pages**.
-2. « Source » : **Deploy from a branch**. « Branch » : **main**, dossier **/ (root)**. **Save**.
-3. Après une ou deux minutes, l'adresse de votre page s'affiche en haut de cette même page Settings → Pages
-   (de la forme `https://<votre-nom>.github.io/<nom-du-dépôt>/`). Mettez-la dans vos favoris, sur votre téléphone aussi.
+1. Créez un compte gratuit sur <https://serpapi.com/users/sign_up> (offre **Free** : 250 requêtes par mois ; le réglage de départ en utilise ~155).
+2. Copiez votre clé sur <https://serpapi.com/manage-api-key>.
+3. Dans le classeur, onglet **Réglages**, collez-la dans la cellule jaune **Clé SerpApi**
+   (le script la rangera en lieu sûr et effacera la cellule).
 
-> GitHub Pages est gratuit pour un dépôt **public**. Pour un dépôt **privé**, il faut un abonnement GitHub payant.
-> La clé SerpApi, elle, reste cachée dans tous les cas.
+### 2. Autoriser les mises à jour automatiques
 
-### Étape 5 — Premier lancement (l'essai à la main)
+Ouvrez <https://script.google.com/home/usersettings> et mettez **API Google Apps Script** sur **Activé**.
 
-1. Onglet **Actions** du dépôt → à gauche **Collecte quotidienne** → bouton **Run workflow**.
-2. Choisissez le mode **essai** → **Run workflow**. Attendez une minute, puis cliquez sur la ligne qui apparaît, puis sur **collecte** → **Lancer la collecte**.
-3. Vous lisez le résultat pour **un hôtel et une date** : prix par site, note, restauration, et le compteur de requêtes. **Rien n'est enregistré.** Coût : 2 requêtes.
-4. Si c'est bon, relancez **Run workflow** avec le mode **normal** : cette fois tous les hôtels sont relevés et enregistrés, et la page web se remplit.
-5. Ensuite, plus rien à faire : le robot tourne seul chaque matin.
+### 3. Coller le script (la seule fois)
 
-Les modes disponibles dans **Run workflow** :
+1. Dans le classeur : menu **Extensions → Apps Script**.
+2. **Le code** : ouvrez <https://raw.githubusercontent.com/p69gp84gk7-arch/83nchm4Luch0N-/main/apps-script/Code.gs>,
+   sélectionnez tout, copiez ; dans `Code.gs`, effacez tout et collez.
+3. **Le fichier de réglages** : à gauche, roue dentée **Paramètres du projet** → cochez
+   **Afficher le fichier manifeste « appsscript.json » dans l'éditeur**. Revenez à l'éditeur (icône `< >`),
+   ouvrez `appsscript.json`, effacez tout et collez le contenu de
+   <https://raw.githubusercontent.com/p69gp84gk7-arch/83nchm4Luch0N-/main/apps-script/appsscript.json>.
+4. **Enregistrez** (icône disquette).
 
-| Mode | Ce qu'il fait | Coût |
+### 4. Cliquer sur « Exécuter »
+
+1. En haut de l'éditeur, choisissez la fonction **installer**, puis **Exécuter**.
+2. Google demande d'autoriser le script (comme pour vos autres scripts) :
+   **Examiner les autorisations → votre compte → Paramètres avancés → Accéder à … (non sécurisé) → Autoriser**.
+3. En une minute, le script range la clé, programme la collecte **chaque jour** (7 h) et **à l'ouverture du classeur**,
+   programme sa propre **mise à jour quotidienne**, puis lance la **première collecte**.
+
+Les cases **Dernière collecte** et **Mise à jour du script** des Réglages montrent le résultat. Rechargez le classeur pour voir le menu **Veille hôtels**.
+
+---
+
+## Les mises à jour
+
+Vous n'avez plus jamais à copier-coller de code :
+
+1. Je propose une modification dans une **pull request** sur GitHub.
+2. Vous la relisez et cliquez **Merge** : c'est votre feu vert.
+3. Le lendemain (une heure avant la collecte), le script compare son code à celui de GitHub et **se met à jour tout seul**.
+   Pour ne pas attendre : menu **Veille hôtels → Mettre à jour le script depuis GitHub**.
+
+La case **Mise à jour du script** des Réglages indique la date et le résultat (« déjà à jour », « nouvelle version installée »…).
+
+**Seule chose à faire de votre côté, et seulement si vous utilisez la page web** : la redéployer (voir ci-dessous).
+Si une nouvelle version demande une autorisation supplémentaire, la case l'indiquera : exécutez à nouveau **installer** dans l'éditeur.
+
+---
+
+### (Facultatif) La page web avec graphique et comparateur
+
+1. Le fichier `Page` arrive tout seul avec la première mise à jour (ou menu **Veille hôtels → Mettre à jour le script depuis GitHub**).
+2. Dans l'éditeur Apps Script : **Déployer → Nouveau déploiement** → type **Application Web** → « Exécuter en tant que » : **Moi**,
+   « Qui a accès » : **Moi uniquement** → **Déployer**. Gardez l'adresse (elle finit par `/exec`) dans vos favoris.
+
+À l'ouverture, la page lance la collecte du jour si elle n'est pas faite, puis se met à jour toute seule.
+
+> **Après chaque mise à jour du script**, la page garde l'ancienne version tant que vous n'avez pas fait
+> **Déployer → Gérer les déploiements → ✏️ → Version : Nouvelle version → Déployer** (l'adresse ne change pas).
+> Le menu, les collectes et le classeur, eux, utilisent tout de suite la nouvelle version.
+
+---
+
+## Le menu « Veille hôtels »
+
+| Menu | Ce qu'il fait | Coût |
 |---|---|---|
-| `essai` | 1 hôtel, 1 date, affiche le résultat, n'enregistre rien | 2 requêtes |
-| `normal` | collecte complète maintenant | ~4 requêtes (+8 le jour des fiches) |
-| `fiches` | collecte complète + fiches détaillées de tous les hôtels | ~12 requêtes |
-| `quota` | affiche seulement le compteur SerpApi | gratuit |
-| `auto` | collecte du jour seulement si elle n'a pas encore été faite (utilisé par la page) | ~4 requêtes, ou 0 si déjà faite |
-
----
-
-## Lancer la collecte quand j'ouvre la page (facultatif)
-
-Sans réglage, le robot passe **chaque matin**. Vous pouvez aussi demander à la page de le réveiller
-**quand vous l'ouvrez**, si la collecte du jour n'a pas encore été faite.
-
-**Réglage, une fois par appareil (ordinateur, téléphone…)** :
-1. Sur la page, cadre « Collecte », cliquez **« Lancer à l'ouverture… »**.
-2. Suivez les 5 étapes affichées pour créer une **clé GitHub** (« fine-grained personal access token ») :
-   - accès à **ce dépôt seulement** ;
-   - permissions **Actions : Read and write** et **Contents : Read-only** ;
-   - expiration : 1 an (il faudra en recréer une ensuite ; la page vous préviendra : « clé refusée »).
-3. Collez la clé, cliquez **« Enregistrer sur cet appareil »**.
-
-**Ensuite, à chaque ouverture de la page** :
-- collecte du jour déjà faite → la page l'indique (« ✓ Collecte du jour déjà faite ») et **ne relance rien** ;
-- pas encore faite → la page lance le robot, affiche « Collecte en cours… » (environ 1 minute), puis se met à jour toute seule ;
-- la collecte a échoué → la page affiche un lien vers le compte rendu et **ne réessaie pas toute seule**.
-
-Ouvrir la page dix fois dans la journée ne coûte donc **rien de plus** : une seule collecte par jour.
-Le bouton **« Relancer maintenant »** force une nouvelle collecte (il demande confirmation, car elle coûte environ 4 requêtes).
-
-**Sécurité** : la clé est rangée seulement dans le navigateur de l'appareil, jamais dans le dépôt.
-Elle ne permet que de lancer le robot et de lire les fichiers de ce dépôt.
-Pour l'effacer : « Clé GitHub… » → « Oublier la clé ». Pour l'annuler partout : supprimez-la sur
-<https://github.com/settings/personal-access-tokens>.
+| Lancer la collecte maintenant | Collecte complète | ~4 requêtes (+8 le jour des fiches) |
+| Essai | 1 hôtel, 1 date, n'enregistre rien | 2 requêtes |
+| Collecte + fiches détaillées | Collecte complète + fiches de tous les hôtels | ~12 requêtes |
+| Voir le compteur SerpApi | Requêtes utilisées et restantes ce mois-ci | gratuit |
+| Enregistrer la clé SerpApi | Remplace la clé (ou collez-la dans Réglages) | gratuit |
+| Activer / Désactiver l'automatisation | Collecte quotidienne, à l'ouverture, et mise à jour du script | — |
+| Mettre à jour le script depuis GitHub | Installe tout de suite la dernière version | gratuit |
 
 ---
 
 ## Le budget de requêtes
 
-Une « requête » = une question posée à SerpApi.
+- **Chaque jour** : 1 requête par date de séjour (elle donne les prix de **tous** les hôtels de Luchon pour cette date) → 4 dates × 30 jours = **120/mois**.
+- **Une fois par semaine** (lundi par défaut) : 1 fiche détaillée par hôtel (plus de sites, étoiles, restauration, petit-déjeuner inclus, notes détaillées) → 8 × ~4,3 = **~35/mois**.
+- **Total ≈ 155/mois** sur 250.
 
-- **Chaque jour** : 1 requête par date de séjour suivie. Une seule requête donne les prix de **tous** les hôtels de Luchon pour cette date.
-  → 4 dates × 30 jours = **120 requêtes/mois**.
-- **Une fois par semaine** (le lundi par défaut) : 1 « fiche détaillée » par hôtel (plus de sites, étoiles, restauration, petit-déjeuner inclus, notes détaillées).
-  → 8 hôtels × ~4,3 semaines = **~35 requêtes/mois**.
-- **Total : ~155 requêtes/mois** sur 250. Il reste de la marge pour vos essais.
+Sécurités : avant chaque collecte, le script lit le compteur SerpApi (gratuit). S'il risque de dépasser le quota, il saute les fiches, puis réduit le nombre de dates, puis s'arrête. La « Réserve de requêtes » (15) reste pour vos essais.
 
-**Sécurités intégrées** :
-- Avant chaque collecte, le programme regarde le compteur SerpApi (cela ne coûte rien).
-- S'il risque de dépasser le quota, il saute d'abord les fiches détaillées, puis réduit le nombre de dates, et s'arrête si besoin.
-- `marge_securite` dans `config.yaml` garde 15 requêtes en réserve.
-- Le compteur « Requêtes SerpApi utilisées ce mois-ci » est affiché en haut de la page web, et chaque lancement est noté dans `data/usage.csv`.
-
-Pour savoir combien coûtera un changement : **(nombre de dates × 30 ÷ fréquence en jours) + (nombre d'hôtels × 4,3)**.
-Exemple : 6 dates tous les jours avec 10 hôtels = 180 + 43 = 223 → encore dans le gratuit, mais juste.
+Pour estimer un changement : **(dates × 30 ÷ fréquence) + (hôtels × 4,3)**.
 
 ---
 
-## Modifier les réglages (`config.yaml`)
+## Modifier les réglages (onglet « Réglages »)
 
-Sur GitHub, ouvrez `config.yaml`, cliquez sur le crayon ✏️, modifiez, puis **Commit changes**. C'est tout.
-
-### Ajouter ou retirer un hôtel
-
-Ajoutez une ligne dans la liste `hotels` :
-
-```yaml
-  - nom: "Hôtel du Parc"
-```
-
-Pour retirer un hôtel, supprimez sa ligne (son historique reste dans les fichiers).
-
-Si le robot écrit « non trouvé » pour un hôtel alors qu'il existe, c'est que Google l'affiche sous un autre nom.
-Cherchez-le sur Google Hotels et ajoutez ce nom :
-
-```yaml
-  - nom: "Hôtel Céleste"
-    autres_noms: ["Céleste Hôtel Luchon"]
-```
-
-Un hôtel peut aussi être « non trouvé » parce qu'il est **complet** ou **fermé** à la date demandée : c'est normal.
-
-### Ajouter ou changer une date de séjour
-
-```yaml
-dates_sejour:
-  - nom: "Week-end de Pâques"
-    arrivee: "2027-03-27"     # date d'arrivée, format année-mois-jour
-  - nom: "Dans 30 jours"
-    arrivee: "+30"            # toujours 30 jours après le jour du relevé
-```
-
-- Une date passée est **ignorée automatiquement** (le robot le signale dans son compte rendu) : remplacez-la.
-- Gardez le même `nom` si vous voulez que les courbes continuent sur la page.
-- Chaque date en plus coûte ~30 requêtes par mois.
-
-### Changer la fréquence
-
-- `frequence_jours: 1` = tous les jours ; `2` = un jour sur deux ; `7` = une fois par semaine.
-- `jour_fiches: 0` = fiches détaillées le lundi (1 = mardi … 6 = dimanche).
-
-### Changer l'heure de lancement
-
-Dans `.github/workflows/collecte.yml`, la ligne `- cron: "17 5 * * *"` veut dire « 5 h 17 UTC chaque jour »
-(6 h 17 à Paris en hiver, 7 h 17 en été). Pour 20 h 30 à Paris en hiver : `"30 19 * * *"`.
-GitHub lance parfois le robot avec quelques minutes (voire une heure) de retard : c'est normal.
+- **Ajouter un hôtel** : écrivez son nom sur une nouvelle ligne de la liste « Hôtels suivis ».
+  S'il est « non trouvé », ajoutez dans « Autres noms » le nom exact affiché sur Google Hotels (plusieurs noms séparés par `;`).
+  Un hôtel peut aussi être absent un jour parce qu'il est complet ou fermé.
+- **Retirer un hôtel** : effacez sa ligne (son historique reste dans les onglets de données).
+- **Dates de séjour** : une date d'arrivée par ligne, ou `+30` pour « dans 30 jours ». Une date passée est ignorée et signalée : remplacez-la. Gardez le même nom pour que les courbes continuent.
+- **Fréquence**, **jour des fiches**, **quota**, **réserve** : se lisent à chaque collecte.
+- **Heure de la collecte** : après un changement, refaites **Activer l'automatisation**.
 
 ---
 
 ## Lire la page web
 
-**En haut** : la date de la **dernière mise à jour** et le **compteur de requêtes** du mois.
-
-**Les réglages** (au-dessus du graphique, ils s'appliquent à toute la page) :
-- **Séjour suivi** : la date de séjour à étudier (Noël, février…).
-- **Du / Au** : la période des relevés affichés.
-- **Site** : « Tous » = le prix le moins cher, tous sites confondus ; ou un site précis (ex. seulement Booking.com).
-- **Courbes par** : une courbe par **hôtel**, ou une courbe par **catégorie** (moyenne des hôtels 2 étoiles, 3 étoiles…).
-
-**Le graphique** : chaque point est le prix le plus bas relevé ce jour-là pour le séjour choisi. Touchez/survolez pour voir les valeurs. Cliquez un nom dans la légende pour masquer ou réafficher sa courbe.
-
-**Le tableau comparatif**, pour chaque hôtel :
-- **Prix le plus bas** sur la période (et à quelle date il a été vu) ;
-- **Site le moins cher** au dernier relevé ;
-- **Dernier prix** ;
-- **Évolution** entre le premier et le dernier relevé de la période (▲ rouge = hausse, ▼ vert = baisse) ;
-- **Note /10** (note Google sur 5 × 2) et **nombre d'avis** ;
-- **Restaurant** et **petit-déjeuner** (« non indiqué » = Google ne donne pas l'information).
-
-Cliquez un titre de colonne pour trier.
-
-**Le comparateur** : cochez 2 hôtels ou plus dans la colonne « Comparer ». Ils s'affichent côte à côte avec les derniers prix **site par site** (le moins cher en gras, avec les offres : annulation gratuite, petit-déjeuner inclus, site officiel), la note détaillée et les équipements.
+- **En haut** : dernière mise à jour, compteur de requêtes, état de la collecte, lien vers le classeur.
+- **Réglages de la page** : séjour suivi, période (Du / Au), site (tous ou un seul), courbes par hôtel ou par catégorie.
+- **Graphique** : le prix le plus bas relevé chaque jour pour le séjour choisi. Touchez une courbe pour voir les valeurs ; cliquez un nom de la légende pour le masquer.
+- **Tableau comparatif** : prix le plus bas (et sa date), site le moins cher, dernier prix, évolution (▲ hausse, ▼ baisse), note /10, avis, restauration. Cliquez un titre pour trier.
+- **Comparateur** : cochez 2 hôtels ou plus ; ils s'affichent côte à côte avec les prix site par site et les offres (annulation gratuite, petit-déjeuner inclus, site officiel).
 
 ---
 
-## Les fichiers de données (`data/`)
+## Bon à savoir
 
-Ils s'ouvrent dans Excel, LibreOffice ou Google Sheets.
-
-| Fichier | Contenu (une ligne = …) |
-|---|---|
-| `prix.csv` | un prix sur un site, un jour : `date_releve, hotel, sejour, date_sejour, site, prix_nuit_eur, offre, lien` |
-| `avis.csv` | la note d'un hôtel, un jour : `date_releve, hotel, note, note_sur_10, nombre_avis, notes_detaillees` |
-| `hotels.csv` | la fiche d'un hôtel à une date : `date_maj, hotel, nom_google, categorie_etoiles, restaurant_sur_place, petit_dejeuner_propose, equipements_principaux, property_token` (la page utilise la plus récente) |
-| `usage.csv` | un lancement : requêtes utilisées par ce lancement, dans le mois, quota, requêtes restantes |
-
-Deux colonnes ont été ajoutées par rapport au cahier des charges, pour rendre service :
-`sejour` (le nom de la date suivie, utile pour « Dans 30 jours » dont la date change chaque jour)
-et `property_token` (l'identifiant Google de l'hôtel, pour le retrouver à coup sûr).
-
----
-
-## Bon à savoir (limites)
-
-- Google Hotels ne montre **pas tous les sites** pour tous les hôtels. Les fiches détaillées du lundi en montrent davantage.
-- Le **petit-déjeuner inclus** n'apparaît que dans les fiches détaillées, et seulement si le site le précise.
-- « Restaurant / petit-déjeuner » est **déduit des équipements** listés par Google : c'est une indication, pas une garantie.
-- Un hôtel peut être absent un jour donné (complet, fermé, ou absent de la première page de résultats).
-  Si plusieurs hôtels manquent souvent, passez `pages_max` à `2` dans `config.yaml` (attention : cela double le coût quotidien).
-- GitHub met en pause les automatismes d'un dépôt resté **60 jours sans aucune modification**. Ici, le robot enregistre des données chaque jour, donc cela n'arrive pas.
-
----
-
-## Pour les curieux : lancer le programme sur son ordinateur
-
-```bash
-pip install -r requirements.txt
-export SERPAPI_KEY="votre_clé"        # sous Windows : set SERPAPI_KEY=votre_clé
-python collecte.py --essai            # 1 hôtel, 1 date, n'enregistre rien
-python collecte.py --essai --hotel "Royal Luchon"
-python collecte.py --quota            # compteur seul, gratuit
-python collecte.py --forcer           # collecte complète
-```
-
-Pour voir la page sur son ordinateur : `python -m http.server`, puis ouvrir <http://localhost:8000>.
+- Google Hotels ne montre pas tous les sites pour tous les hôtels ; les fiches détaillées du lundi en montrent davantage.
+- « Restaurant / petit-déjeuner » est déduit des équipements listés par Google : c'est une indication.
+- Une collecte prend environ une minute. Si deux collectes se croisent (ouverture + heure prévue), la seconde s'arrête aussitôt (« Une collecte est déjà en cours »).
+- Après un an ou deux, l'onglet Prix devient gros (plusieurs dizaines de milliers de lignes) : la page web peut ralentir. On pourra alors archiver les vieux relevés dans un autre classeur.
 
 ---
 
