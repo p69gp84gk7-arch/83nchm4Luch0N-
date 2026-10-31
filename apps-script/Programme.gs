@@ -477,12 +477,15 @@ function collecterSansVerrou(opts, journal) {
     });
   });
 
-  // --- 2) Recherche ciblée sur le nom d'un hôtel jamais trouvé (au plus une par collecte) ---
-  if (budget.cible && !opts.essai) {
+  // --- 2) Recherche ciblée sur le nom des hôtels jamais trouvés (au plus 2 par collecte) ---
+  if (budget.cibles && !opts.essai) {
     const memoire = PropertiesService.getScriptProperties();
-    const candidat = hotels.find(h => !infos[h.nom] && !jetonsConnus[h.nom]
-      && ecartJours(memoire.getProperty('cible|' + h.nom) || '2000-01-01', jour) >= 7);
-    if (candidat) {
+    const derniereTentative = h => memoire.getProperty('cible|' + h.nom) || '';
+    const candidats = hotels
+      .filter(h => !infos[h.nom] && !jetonsConnus[h.nom] && ecartJours(derniereTentative(h) || '2000-01-01', jour) >= 7)
+      .sort((a, b) => derniereTentative(a).localeCompare(derniereTentative(b))) // jamais cherchés d'abord
+      .slice(0, budget.cibles);
+    candidats.forEach(candidat => {
       memoire.setProperty('cible|' + candidat.nom, jour);
       const s = sejours[0];
       journal.push('> Recherche ciblée : « ' + candidat.nom + ' »');
@@ -491,7 +494,13 @@ function collecterSansVerrou(opts, journal) {
           check_out_date: s.depart, adults: cfg.adultes }, etat);
         // Google renvoie soit une liste, soit directement la fiche de l'hôtel
         const proprietes = donnees.properties || (donnees.property_token ? [donnees] : []);
-        const p = associerHotels([candidat], proprietes, {})[candidat.nom];
+        // Le nom a été tapé tel quel : un résultat qui contient tous ses mots convient aussi
+        // (ex. « Hotel Etigny Luchon centre » pour « Hôtel d'Etigny »)
+        const contientTout = x => [candidat.nom].concat(candidat.autres_noms || []).some(n => {
+          const mots = simplifier(n), motsGoogle = simplifier(x.name);
+          return mots.length && mots.every(m => motsGoogle.some(g => motsProches(m, g)));
+        });
+        const p = associerHotels([candidat], proprietes, {})[candidat.nom] || proprietes.find(contientTout);
         if (p) {
           infos[candidat.nom] = p;
           let lignes = lignesPrix(p, (p.featured_prices || []).concat(p.prices || []), jour, candidat.nom, s.nom, s.arrivee);
@@ -501,14 +510,18 @@ function collecterSansVerrou(opts, journal) {
           }
           prix = prix.concat(lignes);
           if (p.overall_rating) avis[candidat.nom] = ligneAvis(jour, candidat.nom, p, notesDetaillees(p));
-          journal.push('  - trouvé (Google : « ' + p.name + ' ») : ' + lignes.length + ' site(s). Il aura ses fiches à tour de rôle.');
+          journal.push('  - trouvé (Google : « ' + p.name + ' ») : ' + (lignes.length ? lignes.length + ' site(s)' : 'pas de prix à cette date')
+            + '. Il aura ses fiches à tour de rôle.');
         } else {
-          journal.push('  - toujours introuvable : vérifiez son nom sur Google Hotels (colonne « Autres noms » des Réglages). Nouvel essai dans 7 jours.');
+          const noms = proprietes.slice(0, 5).map(x => '« ' + x.name + ' »').join(', ');
+          journal.push('  - toujours introuvable. ' + (noms ? 'Google a proposé : ' + noms
+            + '. Si l\'un d\'eux est le bon, copiez son nom dans « Autres noms » des Réglages.' : 'Google ne propose rien sous ce nom.')
+            + ' Nouvel essai dans 7 jours.');
         }
       } catch (e) {
         journal.push('  - recherche impossible (' + e.message + ')');
       }
-    }
+    });
   }
 
   // --- 3) Fiches détaillées : prix site par site, petit-déjeuner, étoiles, notes détaillées ---
@@ -635,7 +648,7 @@ const PLAFOND_PAR_COLLECTE = 45; // SerpApi accepte 50 requêtes par heure : on 
  * - la « Réserve de requêtes » des Réglages n'est jamais entamée ;
  * - si le rythme actuel ne tient pas jusqu'à la fin du mois, on réduit : d'abord les fiches
  *   détaillées, puis le nombre de dates (celles du haut de la liste des Réglages passent en premier).
- * Renvoie { sejours, nbFiches, cible } ou { arret: 'message' } (cible : une recherche ciblée est permise).
+ * Renvoie { sejours, nbFiches, cibles } ou { arret: 'message' } (cibles : recherches ciblées permises).
  */
 function budgetCollecte(cfg, compte, sejours, nbFichesVoulues, essai, journal) {
   const restantes = requetesRestantes(cfg, compte);
@@ -666,10 +679,10 @@ function budgetCollecte(cfg, compte, sejours, nbFichesVoulues, essai, journal) {
       + dates.slice(0, garde).map(d => d.nom).join(', ') + ').');
     dates = dates.slice(0, garde);
   }
-  // Recherche ciblée d'un hôtel jamais trouvé : seulement s'il reste de la marge
-  const cible = !essai && projection.total + 4 <= disponible
-    && dates.length * parDate + nbFiches + 1 <= Math.min(disponible, PLAFOND_PAR_COLLECTE);
-  return { sejours: dates, nbFiches: nbFiches, cible: cible };
+  // Recherches ciblées des hôtels jamais trouvés (2 au plus) : seulement s'il reste de la marge
+  const place = Math.min(disponible, PLAFOND_PAR_COLLECTE) - dates.length * parDate - nbFiches;
+  const cibles = essai ? 0 : Math.max(0, Math.min(2, place, disponible - projection.total - 4));
+  return { sejours: dates, nbFiches: nbFiches, cibles: cibles };
 }
 
 /** Requêtes restantes ce mois-ci : { valeur, source }. */
