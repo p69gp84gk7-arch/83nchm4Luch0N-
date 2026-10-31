@@ -573,8 +573,11 @@ function dessinerApercu() {
          <div class="site">sur ${echapper(s.dernier.site)}${s.dernier.lien ? ` · <a href="${echapper(s.dernier.lien)}" target="_blank" rel="noopener">voir l'offre</a>` : ""}
            ${s.plusBas.prix < s.dernier.prix ? `<br><span class="discret">plus bas vu : ${euros(s.plusBas.prix)} le ${dateCourte(s.plusBas.jour)}</span>` : ""}</div>
          ${sparkline(s.points, teinte)}`
-      : `<div class="ligne-prix"><span class="discret">Pas de prix pour ce séjour</span></div>
-         <div class="site discret">complet, fermé ou non trouvé sur Google Hotels</div>`;
+      : info.property_token
+        ? `<div class="ligne-prix"><span class="discret">Pas de prix pour ce séjour</span></div>
+           <div class="site discret">trouvé sur Google Hotels, mais aucune offre à ces dates : fermé, complet ou pas vendu en ligne</div>`
+        : `<div class="ligne-prix"><span class="discret">Pas encore trouvé sur Google Hotels</span></div>
+           <div class="site discret">recherche ciblée sur son nom (2 hôtels par collecte) ; voir le Journal dans Pilotage</div>`;
     return `<article class="carte-hotel ${s ? "" : "sans-prix"}">
       ${photo}<label class="comparer"><input type="checkbox" data-comparer="${echapper(h)}" ${etat.choisis.has(h) ? "checked" : ""}> Comparer</label></div>
       <div class="corps">

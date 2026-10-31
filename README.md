@@ -196,7 +196,7 @@ Si la collecte du jour n'est pas faite, il la lance et se met à jour tout seul.
 ## Bon à savoir
 
 - La recherche quotidienne par ville ne donne qu'**un prix par hôtel** (« Google (prix le plus bas) ») : le détail **site par site** vient des fiches détaillées, faites à tour de rôle.
-- Un hôtel absent des premiers résultats de Google fait l'objet d'une **recherche ciblée** sur son nom (au plus une par collecte, une fois par semaine par hôtel). S'il reste introuvable, ajoutez dans « Autres noms » le nom exact affiché sur Google Hotels.
+- Un hôtel absent des premiers résultats de Google fait l'objet d'une **recherche ciblée** sur son nom (au plus 2 par collecte, une fois par semaine par hôtel ; le Journal montre les noms proposés par Google). S'il reste introuvable, ajoutez dans « Autres noms » le nom exact affiché sur Google Hotels.
 - « Restaurant / petit-déjeuner » est déduit des équipements listés par Google : c'est une indication.
 - Une collecte prend environ une minute. Si deux collectes se croisent (ouverture + heure prévue), la seconde s'arrête aussitôt (« Une collecte est déjà en cours »).
 - Après un an ou deux, l'onglet Prix devient gros (plusieurs dizaines de milliers de lignes) : la page web peut ralentir. On pourra alors archiver les vieux relevés dans un autre classeur.
