@@ -178,6 +178,22 @@
   .budget.ok strong { color: var(--baisse); }
   .budget.attention strong { color: var(--attention); }
   .vide { color: var(--texte-2); padding: 24px 0; text-align: center; }
+  /* ---------- Benchmark ---------- */
+  .titre-bloc { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+  .grille-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; margin-bottom: 16px; }
+  .grille-2 .bloc { margin: 0; }
+  #t-benchmark td.premier { font-weight: 650; }
+  #t-benchmark td.dernier { color: var(--texte-3); }
+  .forts-faibles { display: grid; gap: 10px; }
+  .ff { border-bottom: 1px solid var(--trait); padding-bottom: 8px; font-size: 0.88rem; }
+  .ff .plus { color: var(--baisse); } .ff .moins { color: var(--hausse); }
+  .avis-liste { display: grid; gap: 10px; }
+  .avis { border: 1px solid var(--trait); border-radius: 10px; padding: 10px 12px; font-size: 0.9rem; background: var(--carte); }
+  .avis .entete-avis { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; color: var(--texte-2); font-size: 0.82rem; margin-bottom: 4px; }
+  .avis .entete-avis strong { color: var(--texte); font-size: 0.9rem; }
+  .avis p { margin: 0; }
+  .zone-graphique.carre { height: 380px; }
+
   /* ---------- Carte ---------- */
   .grille-carte { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
   @media (max-width: 820px) { .grille-carte { grid-template-columns: 1fr; } }
@@ -220,6 +236,7 @@
 
   <nav class="onglets" role="tablist">
     <button class="onglet" role="tab" data-vue="apercu" aria-selected="true">Aperçu</button>
+    <button class="onglet" role="tab" data-vue="benchmark" aria-selected="false">Benchmark</button>
     <button class="onglet" role="tab" data-vue="evolution" aria-selected="false">Évolution</button>
     <button class="onglet" role="tab" data-vue="comparer" aria-selected="false">Comparer</button>
     <button class="onglet" role="tab" data-vue="carte" aria-selected="false">Carte</button>
@@ -241,6 +258,41 @@
       <span class="discret" id="info-cartes"></span>
     </div>
     <div class="cartes" id="cartes"></div>
+  </section>
+
+  <!-- ===== Benchmark ===== -->
+  <section id="v-benchmark" hidden>
+    <div class="bloc">
+      <div class="titre-bloc"><h2>Tableau de benchmark</h2>
+        <button type="button" class="bouton" id="b-export">Exporter le tableau (CSV)</button></div>
+      <p class="aide" id="bm-intro"></p>
+      <div class="defile"><table id="t-benchmark"></table></div>
+      <p class="aide" style="margin:10px 0 0">
+        <strong>Note multi-sites</strong> : moyenne des notes de chaque site ramenées sur 10, pondérée par leur nombre d'avis.
+        <strong>Indice de prix</strong> : 100 = prix médian des hôtels suivis pour ce séjour (120 = 20 % plus cher).
+        <strong>Offres</strong> : séjours suivis pour lesquels l'hôtel a un prix au dernier relevé.
+        <strong>Parité</strong> : écart entre le site officiel et l'agence en ligne la moins chère (+ = officiel plus cher).
+        <strong>Réponse aux avis</strong> : part des avis récents relevés auxquels l'hôtel a répondu. « — » = pas encore d'information.</p>
+    </div>
+    <div class="grille-2">
+      <div class="bloc">
+        <h2>Positionnement prix / satisfaction</h2>
+        <p class="aide">Chaque point est un hôtel. À droite : plus cher que la médiane ; en haut : mieux noté que la médiane.</p>
+        <div class="zone-graphique carre"><canvas id="g-position" aria-label="Positionnement prix et satisfaction"></canvas></div>
+        <p class="vide" id="g-position-vide" hidden></p>
+      </div>
+      <div class="bloc">
+        <h2>Points forts et points faibles</h2>
+        <p class="aide">D'après les thèmes des avis Google (au moins 5 mentions) : part des mentions positives.</p>
+        <div class="forts-faibles" id="bm-themes"></div>
+      </div>
+    </div>
+    <div class="bloc">
+      <div class="titre-bloc"><h2>Avis récents</h2>
+        <label class="discret">Hôtel <select id="bm-filtre-avis"></select></label></div>
+      <p class="aide">Relevés à tour de rôle (réglage « Avis récents par jour »), sans le nom des auteurs.</p>
+      <div class="avis-liste" id="bm-avis"></div>
+    </div>
   </section>
 
   <!-- ===== Évolution ===== -->
@@ -371,6 +423,7 @@
 // =====================================================================
 const etat = {
   prix: [], avis: [], hotels: [], usage: [], reglages: { hotels: [], dates: [] }, journal: [], infos: {}, etablissements: [],
+  avisSites: [], themes: [], avisClients: [],
   sejour: null, vue: "apercu", modeCourbes: "hotel", choisis: new Set(), tri: { col: "dernier", asc: true },
 };
 const $ = (id) => document.getElementById(id);
@@ -595,6 +648,242 @@ $("cartes").addEventListener("change", (e) => {
   e.target.checked ? etat.choisis.add(h) : etat.choisis.delete(h);
   toast(etat.choisis.size >= 2 ? `${etat.choisis.size} hôtels à comparer : onglet « Comparer »` : "Cochez au moins 2 hôtels pour les comparer");
 });
+
+// ------------------------- Benchmark -------------------------
+const sur10 = (v) => (v == null || isNaN(v) ? "—" : v.toFixed(1).replace(".", ","));
+const pct = (v) => (v == null || isNaN(v) ? "—" : Math.round(v) + " %");
+const contient = (texte, mot) => String(texte || "").toLowerCase().includes(mot);
+
+// Sites dont on affiche la note (hors Google) : les plus fréquents dans les relevés
+function sitesAvis() {
+  const n = {};
+  etat.avisSites.forEach((l) => { if (l.source !== "Google") n[l.source] = (n[l.source] || 0) + 1; });
+  return Object.keys(n).sort((a, b) => n[b] - n[a]).slice(0, 3);
+}
+
+// Toutes les mesures du benchmark pour le séjour choisi
+function mesuresBenchmark() {
+  const series = seriesSejour(etat.sejour);
+  const avecPrix = etat.ordreHotels.filter((h) => series[h]).map((h) => series[h].dernier.prix).sort((a, b) => a - b);
+  const mediane = avecPrix.length ? (avecPrix.length % 2 ? avecPrix[(avecPrix.length - 1) / 2] : (avecPrix[avecPrix.length / 2 - 1] + avecPrix[avecPrix.length / 2]) / 2) : null;
+  const sejours = listeSejours();
+  const parSejour = sejours.map((x) => seriesSejour(x.nom));
+  const derniersJours = parSejour.map((sr) => Object.values(sr).reduce((m, v) => (v.dernier.jour > m ? v.dernier.jour : m), ""));
+  return etat.ordreHotels.map((h) => {
+    const sr = series[h], info = etat.infos[h] || {};
+    const notes = etat.avisSites.filter((l) => l.hotel === h);
+    const google = notes.find((l) => l.source === "Google");
+    const parSite = {};
+    notes.forEach((l) => { parSite[l.source] = { note: nombre(l.note_sur_10), avis: parseInt(l.nombre_avis, 10) }; });
+    if (!google) { const n = noteSur10(h); if (n && !isNaN(n.note)) parSite.Google = { note: n.note, avis: n.avis }; }
+    let poids = 0, somme = 0, totalAvis = 0;
+    Object.values(parSite).forEach((x) => { if (isNaN(x.note)) return; const w = isNaN(x.avis) || x.avis <= 0 ? 1 : x.avis; somme += x.note * w; poids += w; totalAvis += isNaN(x.avis) ? 0 : x.avis; });
+    const themes = etat.themes.filter((t) => t.hotel === h);
+    const mentions = themes.reduce((a, t) => a + (Number(t.mentions) || 0), 0), positifs = themes.reduce((a, t) => a + (Number(t.positifs) || 0), 0);
+    const avisRecents = etat.avisClients.filter((a) => a.hotel === h);
+    const repondus = avisRecents.filter((a) => a.reponse_hotel === "oui").length;
+    // Offres du dernier relevé pour le séjour choisi
+    const lignes = sr ? etat.prix.filter((l) => l.hotel === h && l.sejour === etat.sejour && l.date_releve === sr.dernier.jour) : [];
+    const officiel = lignes.filter((l) => contient(l.offre, "site officiel")).map((l) => nombre(l.prix_nuit_eur));
+    const agences = lignes.filter((l) => !contient(l.offre, "site officiel") && !String(l.site).startsWith("Google")).map((l) => nombre(l.prix_nuit_eur));
+    const offres = parSejour.filter((x, i) => x[h] && x[h].dernier.jour === derniersJours[i]).length;
+    return {
+      hotel: h, etoiles: Number(info.categorie_etoiles) || null,
+      prix: sr ? sr.dernier.prix : null, site: sr ? sr.dernier.site : "",
+      indice: sr && mediane ? Math.round((100 * sr.dernier.prix) / mediane) : null,
+      offres, nbSejours: sejours.length,
+      multi: poids ? somme / poids : null, totalAvis: totalAvis || null,
+      parSite, emplacement: info.note_emplacement_sur_10 !== "" && info.note_emplacement_sur_10 != null ? nombre(info.note_emplacement_sur_10) : null,
+      positif: mentions ? (100 * positifs) / mentions : null,
+      reponse: avisRecents.length ? (100 * repondus) / avisRecents.length : null, nbAvisRecents: avisRecents.length,
+      parite: officiel.length && agences.length ? Math.min(...officiel) - Math.min(...agences) : null,
+      pdj: lignes.length ? (lignes.some((l) => contient(l.offre, "petit-déjeuner inclus")) ? "oui" : "non") : null,
+      annulation: lignes.length ? (100 * lignes.filter((l) => contient(l.offre, "annulation gratuite")).length) / lignes.length : null,
+      prixHabituel: info.prix_habituel_min !== "" && info.prix_habituel_min != null ? euros(nombre(info.prix_habituel_min)) + " – " + euros(nombre(info.prix_habituel_max)) : "",
+    };
+  });
+}
+
+function colonnesBenchmark() {
+  const sites = sitesAvis();
+  return [
+    { cle: "hotel", titre: "Hôtel", texte: (m) => m.hotel },
+    { cle: "etoiles", titre: "★", num: true, texte: (m) => (m.etoiles ? m.etoiles + "★" : "—") },
+    { cle: "prix", titre: "Prix / nuit", num: true, texte: (m) => euros(m.prix) },
+    { cle: "indice", titre: "Indice de prix", num: true, texte: (m) => (m.indice == null ? "—" : m.indice) },
+    { cle: "offres", titre: "Offres", num: true, texte: (m) => m.offres + " / " + m.nbSejours },
+    { cle: "multi", titre: "Note multi-sites /10", num: true, texte: (m) => sur10(m.multi) },
+    { cle: "totalAvis", titre: "Avis (tous sites)", num: true, texte: (m) => (m.totalAvis ? m.totalAvis.toLocaleString("fr-FR") : "—") },
+    { cle: "google", titre: "Google /10", num: true, valeur: (m) => (m.parSite.Google || {}).note, texte: (m) => sur10((m.parSite.Google || {}).note) },
+    ...sites.map((src) => ({ cle: "site:" + src, titre: src + " /10", num: true, valeur: (m) => (m.parSite[src] || {}).note, texte: (m) => sur10((m.parSite[src] || {}).note) })),
+    { cle: "emplacement", titre: "Emplacement /10", num: true, texte: (m) => sur10(m.emplacement) },
+    { cle: "positif", titre: "Mentions positives", num: true, texte: (m) => pct(m.positif) },
+    { cle: "reponse", titre: "Réponse aux avis", num: true, texte: (m) => (m.reponse == null ? "—" : pct(m.reponse) + ` <span class="discret">(${m.nbAvisRecents})</span>`) },
+    { cle: "parite", titre: "Parité officiel / agences", num: true, texte: (m) => (m.parite == null ? "—" : (m.parite > 0 ? "+" : "") + euros(m.parite)) },
+    { cle: "pdj", titre: "Petit-déj. inclus", texte: (m) => m.pdj || "—" },
+    { cle: "annulation", titre: "Annulation gratuite", num: true, texte: (m) => pct(m.annulation) },
+    { cle: "prixHabituel", titre: "Prix habituel (Google)", texte: (m) => m.prixHabituel || "—" },
+  ];
+}
+etat.triBm = { col: "multi", asc: false };
+
+function dessinerBenchmark() {
+  const mesures = mesuresBenchmark(), cols = colonnesBenchmark();
+  const valeur = (m, c) => (c.valeur ? c.valeur(m) : m[c.cle]);
+  const { col, asc } = etat.triBm;
+  const cTri = cols.find((c) => c.cle === col) || cols[0];
+  mesures.sort((a, b) => {
+    const x = valeur(a, cTri), y = valeur(b, cTri);
+    const vide = (v) => v == null || v === "" || (typeof v === "number" && isNaN(v));
+    if (vide(x) && vide(y)) return 0; if (vide(x)) return 1; if (vide(y)) return -1;
+    return (typeof x === "number" ? x - y : String(x).localeCompare(String(y), "fr")) * (asc ? 1 : -1);
+  });
+  // Meilleur et moins bon de chaque colonne chiffrée (sens : plus haut = mieux, sauf prix, indice et parité)
+  const bas = ["prix", "indice", "parite"];
+  const extremes = {};
+  cols.filter((c) => c.num && !["etoiles", "offres"].includes(c.cle)).forEach((c) => {
+    const vs = mesures.map((m) => valeur(m, c)).filter((v) => typeof v === "number" && !isNaN(v));
+    if (vs.length >= 2) extremes[c.cle] = bas.includes(c.cle) ? [Math.min(...vs), Math.max(...vs)] : [Math.max(...vs), Math.min(...vs)];
+  });
+  $("bm-intro").textContent = `${mesures.length} hôtels suivis · séjour « ${etat.sejour} » · prix du dernier relevé, notes et avis des dernières fiches détaillées. Cliquez un titre de colonne pour trier ; en gras le meilleur de chaque colonne.`;
+  $("t-benchmark").innerHTML = "<thead><tr>" + cols.map((c) =>
+    `<th data-col="${echapper(c.cle)}" class="${c.num ? "num " : ""}${c.cle === col ? "tri" + (asc ? " asc" : "") : ""}">${echapper(c.titre)}</th>`).join("") + "</tr></thead><tbody>" +
+    mesures.map((m) => "<tr>" + cols.map((c, i) => {
+      const v = valeur(m, c), e = extremes[c.cle];
+      const classe = (c.num ? "num " : "") + (e && v === e[0] ? "premier" : e && v === e[1] ? "dernier" : "");
+      const contenu = i === 0 ? `<span class="puce" style="display:inline-block;margin-right:6px;background:${couleur(m.hotel)}"></span>${echapper(m.hotel)}` : c.texte(m);
+      return `<td class="${classe}">${contenu}</td>`;
+    }).join("") + "</tr>").join("") + "</tbody>";
+  etat.derniersBm = { mesures, cols };
+  dessinerPositionnement(mesures);
+  dessinerForcesFaiblesses();
+  dessinerAvisRecents();
+}
+$("t-benchmark").addEventListener("click", (e) => {
+  const th = e.target.closest("th");
+  if (!th) return;
+  const col = th.dataset.col;
+  etat.triBm = { col, asc: etat.triBm.col === col ? !etat.triBm.asc : ["prix", "indice", "parite", "hotel"].includes(col) };
+  dessinerBenchmark();
+});
+
+// Export CSV du tableau (séparateur « ; » pour Excel en français)
+$("b-export").addEventListener("click", () => {
+  const { mesures, cols } = etat.derniersBm || {};
+  if (!mesures) return;
+  const brut = (html) => String(html).replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").trim();
+  const cellule = (t) => '"' + String(t).replace(/"/g, '""') + '"';
+  const lignes = [cols.map((c) => cellule(c.titre)).join(";")].concat(mesures.map((m) => cols.map((c) => cellule(brut(c.texte(m)))).join(";")));
+  const lien = document.createElement("a");
+  lien.href = URL.createObjectURL(new Blob(["\ufeff" + lignes.join("\r\n")], { type: "text/csv;charset=utf-8" }));
+  lien.download = `benchmark-luchon-${etat.sejour.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\W+/g, "-").toLowerCase()}-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(lien); lien.click(); lien.remove();
+});
+
+let graphiquePosition = null;
+function dessinerPositionnement(mesures) {
+  const points = mesures.filter((m) => m.indice != null && m.multi != null);
+  if (graphiquePosition) { graphiquePosition.destroy(); graphiquePosition = null; }
+  $("g-position-vide").hidden = points.length >= 2;
+  if (points.length < 2) { $("g-position-vide").textContent = "Il faut au moins 2 hôtels avec un prix et des notes pour ce séjour."; return; }
+  const notes = points.map((m) => m.multi).sort((a, b) => a - b);
+  const noteMediane = notes.length % 2 ? notes[(notes.length - 1) / 2] : (notes[notes.length / 2 - 1] + notes[notes.length / 2]) / 2;
+  const css = getComputedStyle(document.documentElement);
+  const texte = css.getPropertyValue("--texte").trim(), texte2 = css.getPropertyValue("--texte-2").trim(), texte3 = css.getPropertyValue("--texte-3").trim();
+  const grille = css.getPropertyValue("--grille").trim(), carte = css.getPropertyValue("--carte").trim();
+  // Repères (prix médian, note médiane), noms à côté des points et légende des quadrants
+  const reperes = {
+    id: "reperes",
+    afterDatasetsDraw(c) {
+      const { ctx, chartArea: a, scales: { x, y } } = c;
+      ctx.save();
+      ctx.setLineDash([4, 4]); ctx.strokeStyle = texte3; ctx.lineWidth = 1;
+      const x0 = x.getPixelForValue(100), y0 = y.getPixelForValue(noteMediane);
+      ctx.beginPath(); ctx.moveTo(x0, a.top); ctx.lineTo(x0, a.bottom); ctx.moveTo(a.left, y0); ctx.lineTo(a.right, y0); ctx.stroke();
+      ctx.setLineDash([]); ctx.font = "11px system-ui, sans-serif"; ctx.fillStyle = texte3;
+      ctx.textAlign = "left"; ctx.fillText("moins cher, mieux noté", a.left + 6, a.top + 14);
+      ctx.textAlign = "right"; ctx.fillText("plus cher, mieux noté", a.right - 6, a.top + 14);
+      ctx.textAlign = "left"; ctx.fillText("moins cher, moins bien noté", a.left + 6, a.bottom - 8);
+      ctx.textAlign = "right"; ctx.fillText("plus cher, moins bien noté", a.right - 6, a.bottom - 8);
+      ctx.font = "12px system-ui, sans-serif"; ctx.fillStyle = texte;
+      // Noms à côté des points, décalés verticalement s'ils se chevauchent
+      const elements = c.data.datasets.map((d, i) => ({ d, pt: c.getDatasetMeta(i).data[0] })).filter((x) => x.pt);
+      // Zones déjà prises : les points eux-mêmes, puis chaque nom posé
+      const occupees = elements.map(({ pt }) => ({ y: pt.y + 4, x1: pt.x - 9, x2: pt.x + 9 }));
+      elements.sort((u, v) => u.pt.y - v.pt.y).forEach(({ d, pt }) => {
+        const droite = pt.x < a.right - 120;
+        const largeur = ctx.measureText(d.label).width;
+        const gauche = droite ? pt.x + 11 : pt.x - 11 - largeur;
+        let y = pt.y + 4;
+        const chevauche = (yy) => occupees.some((o) => yy > o.y - 13 && yy < o.y + 13 && gauche < o.x2 && gauche + largeur > o.x1);
+        for (let k = 1; chevauche(y) && k < 14; k++) y = pt.y + 4 + (k % 2 ? 1 : -1) * 13 * Math.ceil(k / 2);
+        occupees.push({ y, x1: gauche, x2: gauche + largeur });
+        if (Math.abs(y - pt.y - 4) > 1) { // nom décalé : un trait le relie à son point
+          ctx.strokeStyle = texte3; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(pt.x + (droite ? 6 : -6), pt.y); ctx.lineTo(droite ? gauche - 2 : gauche + largeur + 2, y - 4); ctx.stroke();
+        }
+        ctx.textAlign = "left";
+        ctx.fillText(d.label, gauche, y);
+      });
+      ctx.restore();
+    },
+  };
+  const xs = points.map((m) => m.indice), ys = points.map((m) => m.multi);
+  graphiquePosition = new Chart($("g-position"), {
+    type: "scatter",
+    data: { datasets: points.map((m) => ({ label: m.hotel, data: [{ x: m.indice, y: m.multi }], backgroundColor: couleur(m.hotel), borderColor: carte, borderWidth: 2, pointRadius: 7, pointHoverRadius: 9 })) },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      layout: { padding: { top: 6, right: 8 } },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: (c) => ` ${c.dataset.label} : indice ${c.parsed.x}, note ${sur10(c.parsed.y)} /10` } },
+      },
+      scales: {
+        x: { title: { display: true, text: "Indice de prix (100 = prix médian)", color: texte2 }, grid: { color: grille },
+          suggestedMin: Math.min(80, ...xs) - 5, suggestedMax: Math.max(120, ...xs) + 5, ticks: { color: texte2 } },
+        y: { title: { display: true, text: "Note multi-sites /10", color: texte2 }, grid: { color: grille },
+          suggestedMin: Math.floor(Math.min(...ys) - 0.5), suggestedMax: Math.min(10, Math.ceil(Math.max(...ys) + 0.3)), ticks: { color: texte2 } },
+      },
+    },
+    plugins: [reperes],
+  });
+}
+
+function dessinerForcesFaiblesses() {
+  const blocs = etat.ordreHotels.map((h) => {
+    const t = etat.themes.filter((x) => x.hotel === h && Number(x.mentions) >= 5).map((x) => ({ nom: x.theme, pct: Number(x.pct_positif), n: Number(x.mentions) }));
+    if (!t.length) return "";
+    const tries = t.slice().sort((a, b) => b.pct - a.pct);
+    const forts = tries.slice(0, 2), faibles = tries.slice(-2).reverse().filter((x) => !forts.includes(x) && x.pct < 75);
+    const item = (x, signe) => `<span class="${signe === "+" ? "plus" : "moins"}">${signe} ${echapper(x.nom)} ${x.pct} %</span> <span class="discret">(${x.n})</span>`;
+    return `<div class="ff"><strong><span class="puce" style="display:inline-block;margin-right:6px;background:${couleur(h)}"></span>${echapper(h)}</strong><br>
+      ${forts.map((x) => item(x, "+")).join(" · ")}${faibles.length ? "<br>" + faibles.map((x) => item(x, "−")).join(" · ") : ""}</div>`;
+  }).filter(Boolean);
+  $("bm-themes").innerHTML = blocs.length ? blocs.join("") : `<p class="discret">Les thèmes arrivent avec les fiches détaillées (2 hôtels par collecte).</p>`;
+}
+
+function dessinerAvisRecents() {
+  const filtre = $("bm-filtre-avis");
+  const choisi = filtre.value;
+  const hotelsAvecAvis = etat.ordreHotels.filter((h) => etat.avisClients.some((a) => a.hotel === h));
+  filtre.innerHTML = `<option value="">Tous</option>` + hotelsAvecAvis.map((h) => `<option>${echapper(h)}</option>`).join("");
+  if (hotelsAvecAvis.includes(choisi)) filtre.value = choisi;
+  const tous = etat.avisClients.filter((a) => !filtre.value || a.hotel === filtre.value).slice().reverse();
+  const liste = tous.slice(0, etat.avisAffiches || 8);
+  $("bm-avis").innerHTML = liste.length ? liste.map((a) => {
+    const n = nombre(a.note_sur_10);
+    const sous = [["chambres", a.note_chambres], ["service", a.note_service], ["emplacement", a.note_emplacement]].filter(([, v]) => v !== "" && v != null)
+      .map(([k, v]) => `${k} ${sur10(nombre(v))}`).join(" · ");
+    return `<div class="avis"><div class="entete-avis"><strong>${echapper(a.hotel)}</strong><span>${isNaN(n) ? "" : sur10(n) + " /10"}</span>
+      <span>${echapper(a.date_avis)}${a.source ? " · " + echapper(a.source) : ""}</span>${sous ? `<span>${sous}</span>` : ""}
+      <span>${a.reponse_hotel === "oui" ? "✓ l'hôtel a répondu" : "sans réponse de l'hôtel"}</span></div><p>${echapper(a.extrait)}</p></div>`;
+  }).join("") + (tous.length > liste.length ? `<button type="button" class="bouton" id="b-plus-avis">Afficher plus (${tous.length - liste.length} autres)</button>` : "")
+    : `<p class="discret">Pas encore d'avis récents : un hôtel est relevé à chaque collecte.</p>`;
+  const plus = $("b-plus-avis");
+  if (plus) plus.onclick = () => { etat.avisAffiches = (etat.avisAffiches || 8) + 20; dessinerAvisRecents(); };
+}
+$("bm-filtre-avis").addEventListener("change", () => { etat.avisAffiches = 8; dessinerAvisRecents(); });
 
 // ------------------------- Évolution -------------------------
 let graphique = null;
@@ -951,8 +1240,8 @@ function dessinerPilotage(d) {
   $("p-quota-detail").textContent = u && u.requetes_restantes !== "" ? `${u.requetes_restantes} requêtes restantes ce mois-ci` : "pas encore de relevé";
   const r = etat.reglages;
   const collectes = 30 / Math.max(1, r.frequence_jours || 1);
-  const estimation = Math.round(collectes * (r.dates.length + r.fiches_par_jour));
-  $("p-estimation").textContent = `Avec les réglages actuels : environ ${estimation} requêtes par mois (${r.dates.length} dates et ${r.fiches_par_jour} fiche${r.fiches_par_jour > 1 ? "s" : ""} détaillée${r.fiches_par_jour > 1 ? "s" : ""} par collecte).`;
+  const estimation = Math.round(collectes * (r.dates.length + r.fiches_par_jour + (r.avis_par_jour || 0)));
+  $("p-estimation").textContent = `Avec les réglages actuels : environ ${estimation} requêtes par mois (par collecte : ${r.dates.length} dates, ${r.fiches_par_jour} fiche${r.fiches_par_jour > 1 ? "s" : ""} détaillée${r.fiches_par_jour > 1 ? "s" : ""} et ${r.avis_par_jour || 0} relevé${(r.avis_par_jour || 0) > 1 ? "s" : ""} d'avis récents).`;
   const b = d.budget;
   if (b) {
     const tient = b.besoin <= b.restantes - b.reserve;
@@ -1021,10 +1310,11 @@ function toutDessiner() {
   const vide = !etat.prix.length;
   dessinerSejours();
   $("vide").hidden = !(vide && etat.vue !== "pilotage" && etat.vue !== "carte");
-  ["apercu", "evolution", "comparer", "carte", "pilotage"].forEach((v) => ($("v-" + v).hidden = v !== etat.vue || (vide && v !== "pilotage" && v !== "carte")));
+  ["apercu", "benchmark", "evolution", "comparer", "carte", "pilotage"].forEach((v) => ($("v-" + v).hidden = v !== etat.vue || (vide && v !== "pilotage" && v !== "carte")));
   if (etat.vue === "carte") { dessinerCarte(); return; }
   if (vide && etat.vue !== "pilotage") return;
   if (etat.vue === "apercu") dessinerApercu();
+  if (etat.vue === "benchmark") dessinerBenchmark();
   if (etat.vue === "evolution") { dessinerGraphique(); dessinerTableau(); }
   if (etat.vue === "comparer") dessinerComparer();
 }
@@ -1034,7 +1324,7 @@ async function charger() {
   const d = await serveur("lireDonnees");
   derniereDonnees = d;
   Object.assign(etat, { prix: d.prix, avis: d.avis, hotels: d.hotels, usage: d.usage, reglages: d.reglages, journal: d.journal,
-    etablissements: d.etablissements || [] });
+    etablissements: d.etablissements || [], avisSites: d.avisSites || [], themes: d.themes || [], avisClients: d.avisClients || [] });
   etat.infos = {};
   d.hotels.forEach((l) => { etat.infos[l.hotel] = l; });
   etat.ordreHotels = [...new Set([...d.reglages.hotels, ...d.prix.map((l) => l.hotel)])];

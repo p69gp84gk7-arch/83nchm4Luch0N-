@@ -42,6 +42,9 @@ Les installations plus anciennes (programme collé directement, premier chargeur
 | **Réglages** | Hôtels suivis, dates de séjour, fréquence, heure, quota. **C'est le seul onglet à modifier.** |
 | **Prix**, **Avis**, **Hôtels**, **Compteur** | Les relevés bruts, ajoutés par le script à chaque collecte. Rien n'est jamais effacé. |
 | **Établissements** | Tous les établissements renvoyés par Google à chaque collecte (suivis ou non), avec position GPS, prix et note : ils alimentent la carte. |
+| **Avis par site** | Note et nombre d'avis de chaque hôtel sur Google, Booking, Tripadvisor, Expedia… (relevés dans les fiches détaillées). |
+| **Thèmes des avis** | Mentions positives / négatives par thème (chambres, petit-déjeuner, service…). |
+| **Avis clients** | Avis récents : note, sous-notes, réponse de l'hôtel, extrait (sans le nom des auteurs). |
 | **Journal** | Le compte rendu de chaque collecte (hôtels trouvés ou « non trouvé », requêtes utilisées), le plus récent en haut. |
 | **Sources** | D'où viennent les données. |
 
@@ -54,7 +57,7 @@ Il va lire le vrai programme sur GitHub et prend tout seul chaque nouvelle versi
 
 ### 1. La clé SerpApi
 
-1. Créez un compte gratuit sur <https://serpapi.com/users/sign_up> (offre **Free** : 250 requêtes par mois ; le réglage de départ en utilise ~180).
+1. Créez un compte gratuit sur <https://serpapi.com/users/sign_up> (offre **Free** : 250 requêtes par mois ; le réglage de départ en utilise ~210).
 2. Copiez votre clé sur <https://serpapi.com/manage-api-key>.
 3. Dans le classeur, onglet **Réglages**, collez-la dans la cellule jaune **Clé SerpApi**
    (le script la rangera en lieu sûr et effacera la cellule).
@@ -132,7 +135,8 @@ et le garde-fou du quota, donc elle ne coûte rien de plus. Changez le code quan
 
 - **Chaque jour** : 1 requête par date de séjour (elle donne les prix de **tous** les hôtels de Luchon pour cette date) → 4 dates × 30 jours = **120/mois**.
 - **Chaque jour, 2 fiches détaillées** (réglage « Fiches détaillées par jour ») : le prix **site par site** (Booking, Expedia, site de l'hôtel…), le petit-déjeuner inclus, les étoiles et les notes détaillées, pour un couple hôtel + date. Les hôtels et les dates passent **à tour de rôle** (le plus ancien d'abord) : avec 8 hôtels, chacun est détaillé tous les 4 jours environ → 2 × 30 = **60/mois**.
-- **Total ≈ 180/mois** sur 250.
+- **Chaque jour, 1 relevé d'avis récents** (réglage « Avis récents par jour ») : les derniers avis d'un hôtel, à tour de rôle → **30/mois**.
+- **Total ≈ 210/mois** sur 250 (réserve de 15 comprise, le garde-fou réduit d'abord les avis récents, puis les fiches, puis les dates).
 
 ### Que se passe-t-il si on dépasse 250 ?
 
@@ -153,7 +157,7 @@ Avant **chaque** collecte (automatique, à l'ouverture, bouton, menu ou essai), 
 Chaque décision est notée dans l'onglet **Journal** (lignes « Budget » et « Économie de requêtes »).
 L'onglet **Pilotage** du tableau de bord affiche le besoin estimé d'ici la fin du mois face aux requêtes restantes.
 
-Pour estimer un changement : **(dates + fiches par jour) × 30 ÷ fréquence**.
+Pour estimer un changement : **(dates + fiches par jour + avis récents par jour) × 30 ÷ fréquence**.
 
 ---
 
@@ -180,6 +184,13 @@ Si la collecte du jour n'est pas faite, il la lance et se met à jour tout seul.
   photo, étoiles, note /10 et avis, prix le plus bas au dernier relevé et son site (avec le lien « voir l'offre »),
   évolution depuis le premier relevé (▲ hausse, ▼ baisse), mini-courbe, restaurant et petit-déjeuner.
   Une carte grisée = pas de prix pour ce séjour (complet, fermé ou non trouvé). Triez par prix, note, baisse ou nom.
+- **Benchmark** : le tableau professionnel du jeu concurrentiel, pour le séjour choisi, uniquement avec des données relevées :
+  prix et **indice de prix** (100 = médiane), **offres** (séjours avec un prix), **note multi-sites** (Google, Booking, Tripadvisor…
+  ramenées sur 10 et pondérées par le nombre d'avis), nombre d'avis tous sites, note de chaque site, note d'**emplacement**,
+  **mentions positives** des avis, **taux de réponse aux avis**, **parité** site officiel / agences, petit-déjeuner inclus,
+  annulation gratuite, prix habituel. Meilleur de chaque colonne en gras, tri par colonne, **export CSV** (Excel).
+  Plus : le **positionnement prix / satisfaction** (graphique à quadrants), les **points forts et faibles** de chaque hôtel
+  (thèmes des avis) et les **avis récents** (note, sous-notes, réponse de l'hôtel, extrait ; sans le nom des auteurs).
 - **Évolution** : le graphique des prix (période, site, courbes par hôtel ou par catégorie) et le tableau comparatif triable.
 - **Comparer** : choisissez 2 hôtels ou plus (ou cochez « Comparer » sur les cartes) pour voir leurs prix site par site et leurs offres.
 - **Carte** : la **zone de collecte** (un cercle autour de Luchon, réglable dans les Réglages : centre et rayon), les **hôtels suivis**
