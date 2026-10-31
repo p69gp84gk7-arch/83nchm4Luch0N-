@@ -24,8 +24,10 @@ const ID_CLASSEUR = '1LfKdFtpxfyKQj4uiVwkyoXF3FMzfAx1yxvDGMyabLZY';
 const FUSEAU = 'Europe/Paris';
 const URL_RECHERCHE = 'https://serpapi.com/search.json';
 const URL_COMPTE = 'https://serpapi.com/account.json'; // consulter son compte ne coûte rien
-// La page web est lue sur GitHub, comme le programme
-const URL_PAGE = 'https://raw.githubusercontent.com/p69gp84gk7-arch/83nchm4Luch0N-/main/apps-script/Page.html';
+// La page (index.html, aussi publiée sur GitHub Pages) est lue sur GitHub, comme le programme
+const URL_PAGE = 'https://raw.githubusercontent.com/p69gp84gk7-arch/83nchm4Luch0N-/main/index.html';
+// Actions de la page web qui consomment des requêtes : elles demandent le code d'accès des Réglages
+const ACTIONS_PROTEGEES = ['collecte', 'essai', 'fiches'];
 
 // Onglets de données et leurs colonnes (l'ordre compte, l'onglet Synthèse s'en sert)
 const ONGLETS = {
@@ -232,13 +234,49 @@ function message(texte, secondes) {
 
 // =====================================================================
 //  Page web (facultatif : Déployer > Nouveau déploiement > Application Web)
-//  La page (apps-script/Page.html) est lue sur GitHub à chaque ouverture.
+//  La page (index.html à la racine du dépôt) est lue sur GitHub à chaque ouverture.
+//  Avec ?api=… l'application Web sert les données à la page GitHub Pages.
 // =====================================================================
 
-function doGet() {
+function doGet(e) {
+  const parametres = (e && e.parameter) || {};
+  if (parametres.api) return repondreApi(parametres);
   return HtmlService.createHtmlOutput(UrlFetchApp.fetch(URL_PAGE).getContentText())
     .setTitle('Veille hôtels Luchon')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+/**
+ * Données et actions pour la page GitHub Pages (application Web déployée pour « Tout le monde »).
+ * Lire les données est libre (prix publics). Les actions qui consomment des requêtes demandent
+ * le code d'accès des Réglages ; la collecte du jour (« auto ») n'en demande pas : elle respecte
+ * la fréquence et le garde-fou du quota, donc elle ne coûte rien de plus qu'à l'ouverture du classeur.
+ */
+function repondreApi(parametres) {
+  let resultat;
+  try {
+    if (parametres.api === 'lireDonnees') {
+      resultat = lireDonnees();
+    } else if (parametres.api === 'collecterDepuisPage') {
+      const demande = JSON.parse(parametres.arg || 'null') || { action: 'auto' };
+      const action = typeof demande === 'object' ? demande.action : 'collecte';
+      if (ACTIONS_PROTEGEES.includes(action) && !codeAccesValide(parametres.code)) {
+        resultat = { ok: false, faite: false, codeRefuse: true, message: "Code d'accès incorrect (onglet Réglages du classeur).", journal: '' };
+      } else {
+        resultat = collecterDepuisPage(demande);
+      }
+    } else {
+      resultat = { erreur: 'Demande inconnue : ' + parametres.api };
+    }
+  } catch (err) {
+    resultat = { erreur: err.message };
+  }
+  return ContentService.createTextOutput(JSON.stringify(resultat)).setMimeType(ContentService.MimeType.JSON);
+}
+
+function codeAccesValide(code) {
+  const attendu = String(valeurReglage("Code d'accès de la page web") || '').trim();
+  return attendu !== '' && String(code || '').trim() === attendu;
 }
 
 /** Données du tableau de bord : relevés (dates en AAAA-MM-JJ), réglages, journal et état de la collecte. */

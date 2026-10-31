@@ -27,7 +27,7 @@ SerpApi les récupère pour nous : c'est la **seule** clé de l'outil, et elle s
 | `apps-script/Code.gs` | Le **chargeur**, collé **une seule fois** dans Apps Script : il lit le programme sur GitHub |
 | `apps-script/Programme.gs` | Le programme : collecte, automatisation, actions du menu, tableau de bord |
 | `apps-script/appsscript.json` | Réglages du projet Apps Script ; sert aussi à mettre à jour les toutes premières installations |
-| `apps-script/Page.html` | La page web (graphique, tableau, comparateur) |
+| `index.html` | **La page web** (tableau de bord), publiée sur GitHub Pages et aussi ouverte dans le classeur |
 
 Le dépôt garde le code et son historique. Le chargeur du classeur lit le programme et la page dans la branche `main`.
 Les installations plus anciennes (programme collé directement, premier chargeur) passent toutes seules au chargeur actuel au premier clic sur « Mettre à jour » du menu.
@@ -92,13 +92,24 @@ La page web, elle aussi, est lue sur GitHub à chaque ouverture : **pas besoin d
 
 ---
 
-### (Facultatif) La page web avec graphique et comparateur
+### 4. La page web sur GitHub Pages (une fois)
 
-Une seule fois, dans l'éditeur Apps Script : **Déployer → Nouveau déploiement** → type **Application Web** →
-« Exécuter en tant que » : **Moi**, « Qui a accès » : **Moi uniquement** → **Déployer**.
-Gardez l'adresse (elle finit par `/exec`) dans vos favoris, sur téléphone aussi.
+L'adresse de la page : **<https://p69gp84gk7-arch.github.io/83nchm4Luch0N-/>** (sur ordinateur et téléphone).
+Pour qu'elle lise les données du classeur, il faut **déployer l'application Web** du script, une seule fois :
 
-À l'ouverture, la page lance la collecte du jour si elle n'est pas faite, puis se met à jour toute seule.
+1. Dans le classeur : **Extensions → Apps Script**.
+2. En haut à droite : **Déployer → Nouveau déploiement**. Roue dentée « Sélectionner le type » → **Application Web**.
+3. « Exécuter en tant que » : **Moi**. « Qui a accès » : **Tout le monde**. Cliquez **Déployer**, autorisez si demandé.
+4. Copiez l'**adresse de l'application Web** (elle finit par `/exec`).
+5. Ouvrez la page GitHub, collez l'adresse dans « Relier la page au classeur », cliquez **Relier**
+   (ou envoyez-la pour qu'elle soit inscrite une fois pour toutes dans `index.html`, ligne `const URL_API`).
+
+Plus jamais besoin de redéployer : le chargeur prend toujours la dernière version du programme et de la page.
+
+**Sécurité** : lire les prix est libre (ce sont des informations publiques). Relancer une collecte, faire un essai ou
+toutes les fiches depuis la page demande le **code d'accès** de l'onglet Réglages (demandé une fois, puis mémorisé
+sur l'appareil). La collecte du jour, lancée à l'ouverture de la page, n'en demande pas : elle respecte la fréquence
+et le garde-fou du quota, donc elle ne coûte rien de plus. Changez le code quand vous voulez dans les Réglages.
 
 ---
 
@@ -161,7 +172,7 @@ Pour estimer un changement : **(dates + fiches par jour) × 30 ÷ fréquence**.
 
 Il **s'ouvre tout seul avec le classeur** (réglage « Ouvrir le tableau de bord à l'ouverture »), et à tout moment par le menu
 **Veille hôtels → Ouvrir le tableau de bord** (le compteur SerpApi est dans l'onglet Pilotage).
-Si la collecte du jour n'est pas faite, il la lance et se met à jour tout seul. La même page sert d'application Web sur téléphone (voir plus haut).
+Si la collecte du jour n'est pas faite, il la lance et se met à jour tout seul. La même page est publiée sur GitHub Pages (voir « La page web sur GitHub Pages »).
 
 - **En haut** : date du dernier relevé, état de la collecte, bouton **Relancer la collecte**, puis le **séjour suivi** (Noël, février…) : un clic change toute la page.
 - **Aperçu** : les indicateurs (le moins cher, prix médian, le mieux noté, hôtels avec un prix) et une **carte par hôtel** :
