@@ -24,11 +24,11 @@ SerpApi les récupère pour nous : c'est la **seule** clé de l'outil, et elle s
 
 | Fichier | Rôle |
 |---|---|
-| `apps-script/Code.gs` | Le script du classeur : menu, collecte, automatisation, page web |
+| `apps-script/Chargeur.gs` | Le chargeur, collé **une seule fois** dans Apps Script : il lit le programme sur GitHub |
+| `apps-script/Code.gs` | Le programme : collecte, automatisation, actions du menu, page web |
 | `apps-script/Page.html` | La page web (graphique, tableau, comparateur) |
-| `apps-script/appsscript.json` | Les réglages du projet Apps Script (fuseau horaire, autorisations) |
 
-Le dépôt garde le code et son historique. Le script du classeur se met à jour tout seul à partir de la branche `main`.
+Le dépôt garde le code et son historique. Le chargeur du classeur lit le programme et la page dans la branche `main`.
 
 ---
 
@@ -43,11 +43,10 @@ Le dépôt garde le code et son historique. Le script du classeur se met à jour
 
 ---
 
-## Installation (une seule fois, environ 10 minutes)
+## Installation (une seule fois, environ 5 minutes)
 
-Le classeur est déjà prêt (onglets, réglages, synthèse). Google ne permet à personne d'autre que vous
-d'installer un script dans votre compte : ces étapes sont le minimum, et **elles ne sont à faire qu'une fois**.
-Ensuite, chaque nouvelle version du script arrive toute seule (voir « Les mises à jour »).
+Comme pour vos autres applications, on colle dans Apps Script un petit **chargeur**, une seule fois.
+Il va lire le vrai programme sur GitHub et prend tout seul chaque nouvelle version.
 
 ### 1. La clé SerpApi
 
@@ -56,60 +55,47 @@ Ensuite, chaque nouvelle version du script arrive toute seule (voir « Les mises
 3. Dans le classeur, onglet **Réglages**, collez-la dans la cellule jaune **Clé SerpApi**
    (le script la rangera en lieu sûr et effacera la cellule).
 
-### 2. Autoriser les mises à jour automatiques
-
-Ouvrez <https://script.google.com/home/usersettings> et mettez **API Google Apps Script** sur **Activé**.
-
-### 3. Coller le script (la seule fois)
+### 2. Coller le chargeur
 
 1. Dans le classeur : menu **Extensions → Apps Script**.
-2. **Le code** : ouvrez <https://raw.githubusercontent.com/p69gp84gk7-arch/83nchm4Luch0N-/main/apps-script/Code.gs>,
-   sélectionnez tout, copiez ; dans `Code.gs`, effacez tout et collez.
-3. **Le fichier de réglages** : à gauche, roue dentée **Paramètres du projet** → cochez
-   **Afficher le fichier manifeste « appsscript.json » dans l'éditeur**. Revenez à l'éditeur (icône `< >`),
-   ouvrez `appsscript.json`, effacez tout et collez le contenu de
-   <https://raw.githubusercontent.com/p69gp84gk7-arch/83nchm4Luch0N-/main/apps-script/appsscript.json>.
-4. **Enregistrez** (icône disquette).
+2. Ouvrez <https://raw.githubusercontent.com/p69gp84gk7-arch/83nchm4Luch0N-/main/apps-script/Chargeur.gs>, sélectionnez tout, copiez.
+3. Dans `Code.gs` : effacez **tout**, collez, puis **enregistrez** (icône disquette).
 
-### 4. Cliquer sur « Exécuter »
+### 3. Exécuter « installer »
 
-1. En haut de l'éditeur, choisissez la fonction **installer**, puis **Exécuter**.
-2. Google demande d'autoriser le script (comme pour vos autres scripts) :
-   **Examiner les autorisations → votre compte → Paramètres avancés → Accéder à … (non sécurisé) → Autoriser**.
-3. En une minute, le script range la clé, programme la collecte **chaque jour** (7 h) et **à l'ouverture du classeur**,
-   programme sa propre **mise à jour quotidienne**, puis lance la **première collecte**.
+1. En haut de l'éditeur, la liste des fonctions affiche **installer** (c'est la première du fichier). Cliquez **Exécuter**.
+2. Google demande d'autoriser le script : **Examiner les autorisations → votre compte → Paramètres avancés → Accéder à … (non sécurisé) → Autoriser**.
+3. En une minute : la clé est rangée, la collecte est programmée **chaque jour** (7 h) et **à l'ouverture du classeur**, et la **première collecte** remplit les onglets.
 
+Le journal en bas de l'éditeur doit finir par « Collecte enregistrée : … ».
 Les cases **Dernière collecte** et **Mise à jour du script** des Réglages montrent le résultat. Rechargez le classeur pour voir le menu **Veille hôtels**.
 
 ---
 
 ## Les mises à jour
 
-Vous n'avez plus jamais à copier-coller de code :
+Plus jamais de copier-coller :
 
 1. Je propose une modification dans une **pull request** sur GitHub.
 2. Vous la relisez et cliquez **Merge** : c'est votre feu vert.
-3. Le lendemain (une heure avant la collecte), le script compare son code à celui de GitHub et **se met à jour tout seul**.
-   Pour ne pas attendre : menu **Veille hôtels → Mettre à jour le script depuis GitHub**.
+3. Au plus tard **10 minutes** après, le chargeur prend la nouvelle version tout seul.
+   Pour la prendre tout de suite : menu **Veille hôtels → Mettre à jour le programme depuis GitHub**.
 
-La case **Mise à jour du script** des Réglages indique la date et le résultat (« déjà à jour », « nouvelle version installée »…).
+Sécurités : un programme qui contient une erreur n'est jamais pris (l'ancien reste en service), et une copie
+du dernier programme est gardée dans le script : si GitHub ne répond pas, tout continue.
+La case **Mise à jour du script** des Réglages indique quand une nouvelle version a été prise.
 
-**Seule chose à faire de votre côté, et seulement si vous utilisez la page web** : la redéployer (voir ci-dessous).
-Si une nouvelle version demande une autorisation supplémentaire, la case l'indiquera : exécutez à nouveau **installer** dans l'éditeur.
+La page web, elle aussi, est lue sur GitHub à chaque ouverture : **pas besoin de la redéployer** après une mise à jour.
 
 ---
 
 ### (Facultatif) La page web avec graphique et comparateur
 
-1. Le fichier `Page` arrive tout seul avec la première mise à jour (ou menu **Veille hôtels → Mettre à jour le script depuis GitHub**).
-2. Dans l'éditeur Apps Script : **Déployer → Nouveau déploiement** → type **Application Web** → « Exécuter en tant que » : **Moi**,
-   « Qui a accès » : **Moi uniquement** → **Déployer**. Gardez l'adresse (elle finit par `/exec`) dans vos favoris.
+Une seule fois, dans l'éditeur Apps Script : **Déployer → Nouveau déploiement** → type **Application Web** →
+« Exécuter en tant que » : **Moi**, « Qui a accès » : **Moi uniquement** → **Déployer**.
+Gardez l'adresse (elle finit par `/exec`) dans vos favoris, sur téléphone aussi.
 
 À l'ouverture, la page lance la collecte du jour si elle n'est pas faite, puis se met à jour toute seule.
-
-> **Après chaque mise à jour du script**, la page garde l'ancienne version tant que vous n'avez pas fait
-> **Déployer → Gérer les déploiements → ✏️ → Version : Nouvelle version → Déployer** (l'adresse ne change pas).
-> Le menu, les collectes et le classeur, eux, utilisent tout de suite la nouvelle version.
 
 ---
 
@@ -122,8 +108,8 @@ Si une nouvelle version demande une autorisation supplémentaire, la case l'indi
 | Collecte + fiches détaillées | Collecte complète + fiches de tous les hôtels | ~12 requêtes |
 | Voir le compteur SerpApi | Requêtes utilisées et restantes ce mois-ci | gratuit |
 | Enregistrer la clé SerpApi | Remplace la clé (ou collez-la dans Réglages) | gratuit |
-| Activer / Désactiver l'automatisation | Collecte quotidienne, à l'ouverture, et mise à jour du script | — |
-| Mettre à jour le script depuis GitHub | Installe tout de suite la dernière version | gratuit |
+| Activer / Désactiver l'automatisation | Collecte quotidienne et à l'ouverture | — |
+| Mettre à jour le programme depuis GitHub | Prend tout de suite la dernière version | gratuit |
 
 ---
 
