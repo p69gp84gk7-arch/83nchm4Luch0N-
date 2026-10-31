@@ -27,7 +27,7 @@ const URL_COMPTE = 'https://serpapi.com/account.json'; // consulter son compte n
 // La page (index.html, aussi publiée sur GitHub Pages) est lue sur GitHub, comme le programme
 const URL_PAGE = 'https://raw.githubusercontent.com/p69gp84gk7-arch/83nchm4Luch0N-/main/index.html';
 // Actions de la page web qui consomment des requêtes : elles demandent le code d'accès des Réglages
-const ACTIONS_PROTEGEES = ['collecte', 'essai', 'fiches', 'suivre'];
+const ACTIONS_PROTEGEES = ['collecte', 'essai', 'fiches', 'suivre', 'zone', 'ajouterDate', 'retirerDate'];
 
 // Onglets de données et leurs colonnes (l'ordre compte, l'onglet Synthèse s'en sert)
 const ONGLETS = {
@@ -35,7 +35,15 @@ const ONGLETS = {
   avis: ['Avis', ['date_releve', 'hotel', 'note', 'note_sur_10', 'nombre_avis', 'notes_detaillees']],
   hotels: ['Hôtels', ['date_maj', 'hotel', 'nom_google', 'categorie_etoiles', 'restaurant_sur_place',
                       'petit_dejeuner_propose', 'equipements_principaux', 'property_token', 'photo',
-                      'latitude', 'longitude']],
+                      'latitude', 'longitude', 'adresse', 'telephone', 'heure_arrivee', 'heure_depart',
+                      'prix_habituel_min', 'prix_habituel_max', 'note_emplacement_sur_10', 'eco_certifie', 'site_officiel']],
+  // Notes de l'hôtel sur chaque site (Google, Booking, Tripadvisor, Expedia…), relevées dans les fiches détaillées
+  avis_sites: ['Avis par site', ['date_releve', 'hotel', 'source', 'note', 'note_max', 'note_sur_10', 'nombre_avis']],
+  // Ce que disent les avis, thème par thème (chambres, petit-déjeuner, service…)
+  themes: ['Thèmes des avis', ['date_releve', 'hotel', 'theme', 'mentions', 'positifs', 'negatifs', 'neutres', 'pct_positif']],
+  // Avis récents (sans le nom des auteurs) : note, sous-notes, réponse de l'hôtel, extrait
+  avis_clients: ['Avis clients', ['date_releve', 'hotel', 'source', 'date_avis', 'note_sur_10', 'note_chambres',
+                                  'note_service', 'note_emplacement', 'reponse_hotel', 'extrait']],
   // Tous les établissements renvoyés par Google (suivis ou non), pour la carte : un relevé par collecte
   etablissements: ['Établissements', ['date_releve', 'nom', 'type', 'latitude', 'longitude', 'prix_nuit_eur',
                                       'note_sur_10', 'nombre_avis', 'hotel_suivi']],
@@ -292,10 +300,13 @@ function lireDonnees() {
     reglages: {
       hotels: cfg.hotels.map(h => h.nom),
       dates: datesValides(cfg, []).map(d => ({ nom: d.nom, arrivee: d.arrivee })),
-      heure: cfg.heure, frequence_jours: cfg.frequence_jours, fiches_par_jour: cfg.fiches_par_jour,
+      heure: cfg.heure, frequence_jours: cfg.frequence_jours, fiches_par_jour: cfg.fiches_par_jour, avis_par_jour: cfg.avis_par_jour,
       a_l_ouverture: cfg.a_l_ouverture, quota: cfg.quota, zone: cfg.zone,
     },
     journal: lireJournal(15),
+    avisSites: dernieresLignes(lireObjets('avis_sites'), l => l.hotel + '|' + l.source),
+    themes: dernierReleveParHotel(lireObjets('themes')),
+    avisClients: lireObjets('avis_clients').slice(-400),
     etablissements: (() => {
       // Le dernier relevé seulement
       const tous = lireObjets('etablissements');
@@ -336,6 +347,71 @@ function suivreHotel(nom) {
     message: '« ' + nom + ' » ajouté aux hôtels suivis : il sera recherché sur Google Hotels à la prochaine collecte.' };
 }
 
+/** Enregistre la zone de chalandise (centre et rayon) dans les Réglages, depuis la carte. */
+function enregistrerZone(z) {
+  const lat = Number(z.latitude), lng = Number(z.longitude), rayon = Math.round(Number(z.rayon_km) * 10) / 10;
+  if (!(lat > 41 && lat < 44 && lng > -1.5 && lng < 3.5) || !(rayon >= 0.5 && rayon <= 30)) {
+    return { ok: false, faite: false, message: 'Zone refusée : centre dans les Pyrénées et rayon entre 0,5 et 30 km.', journal: '' };
+  }
+  const centre = celluleReglage('Zone de collecte : centre (latitude, longitude)');
+  const cRayon = celluleReglage('Zone de collecte : rayon (km)');
+  if (!centre || !cRayon) return { ok: false, faite: false, message: 'Lignes « Zone de collecte » introuvables dans les Réglages.', journal: '' };
+  centre.setValue(lat.toFixed(5) + ', ' + lng.toFixed(5));
+  cRayon.setValue(rayon);
+  return { ok: true, faite: true, journal: '', message: 'Zone enregistrée : ' + String(rayon).replace('.', ',') + ' km autour du centre choisi.' };
+}
+
+/** Ajoute une date de séjour à suivre (et relève tout de suite ses prix si demandé : 1 requête). */
+function ajouterDateSejour(d) {
+  const nom = String(d.nom || '').replace(/^[=+\-@\s]+/, '').trim().slice(0, 40);
+  const arrivee = String(d.arrivee || '');
+  if (!nom || !/^[\p{L}\d][\p{L}\d\s'’&.,\-\/]*$/u.test(nom)) return { ok: false, faite: false, message: 'Nom de séjour refusé.', journal: '' };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(arrivee) || arrivee <= aujourdhui()) {
+    return { ok: false, faite: false, message: "La date d'arrivée doit être après aujourd'hui.", journal: '' };
+  }
+  const cfg = lireReglages();
+  if (cfg.dates.some(x => String(x.nom).toLowerCase() === nom.toLowerCase())) {
+    return { ok: false, faite: false, message: 'Un séjour porte déjà ce nom.', journal: '' };
+  }
+  const feuille = classeur().getSheetByName('Réglages');
+  const valeurs = feuille.getRange(1, 1, feuille.getLastRow() + 1, 5).getValues();
+  const titre = valeurs.findIndex(l => String(l[0]).trim() === 'Hôtels suivis');
+  if (titre < 0) return { ok: false, faite: false, message: 'Liste des dates introuvable dans les Réglages.', journal: '' };
+  let ligne = titre + 2;
+  while (ligne < valeurs.length && String(valeurs[ligne][3]).trim()) ligne++;
+  feuille.getRange(ligne + 1, 4, 1, 2).setValues([[nom, versDate(arrivee)]]);
+  if (!d.collecter) {
+    return { ok: true, faite: true, journal: '', message: '« ' + nom + ' » ajouté : ses prix seront relevés à chaque collecte.' };
+  }
+  const r = collecter({ forcer: true, sejour: nom });
+  return { ok: r.ok, faite: true, journal: r.journal, message: '« ' + nom + ' » ajouté. ' + r.message };
+}
+
+/** Retire une date de séjour des Réglages (son historique reste dans l'onglet Prix). */
+function retirerDateSejour(nom) {
+  const feuille = classeur().getSheetByName('Réglages');
+  const valeurs = feuille.getRange(1, 1, feuille.getLastRow(), 5).getValues();
+  const titre = valeurs.findIndex(l => String(l[0]).trim() === 'Hôtels suivis');
+  const i = valeurs.findIndex((l, k) => k > titre + 1 && String(l[3]).trim() === String(nom || '').trim());
+  if (titre < 0 || i < 0) return { ok: false, faite: false, message: 'Séjour introuvable dans les Réglages.', journal: '' };
+  feuille.getRange(i + 1, 4, 1, 2).setValues([['', '']]);
+  return { ok: true, faite: true, journal: '', message: '« ' + nom + ' » retiré (son historique est gardé).' };
+}
+
+/** Garde la dernière ligne de chaque clé (ex. hôtel + site). */
+function dernieresLignes(lignes, cle) {
+  const m = {};
+  lignes.forEach(l => { m[cle(l)] = l; });
+  return Object.keys(m).map(k => m[k]);
+}
+
+/** Garde, pour chaque hôtel, les lignes de son dernier relevé. */
+function dernierReleveParHotel(lignes) {
+  const dernier = {};
+  lignes.forEach(l => { if (!dernier[l.hotel] || l.date_releve > dernier[l.hotel]) dernier[l.hotel] = l.date_releve; });
+  return lignes.filter(l => l.date_releve === dernier[l.hotel]);
+}
+
 function valeurReglage(libelle) {
   const cellule = celluleReglage(libelle);
   return cellule ? String(cellule.getDisplayValue()) : '';
@@ -357,7 +433,8 @@ function etatCollecte() {
 
 /**
  * Actions du tableau de bord. Le chargeur ne transmet qu'un argument : soit vrai/faux (forcer la collecte),
- * soit une demande { action: 'collecte' | 'auto' | 'essai' | 'fiches', hotel } ou { action: 'suivre', nom }.
+ * soit une demande { action: 'collecte' | 'auto' | 'essai' | 'fiches', hotel }, { action: 'suivre', nom },
+ * { action: 'zone', latitude, longitude, rayon_km }, { action: 'ajouterDate', nom, arrivee, collecter } ou { action: 'retirerDate', nom }.
  */
 function collecterDepuisPage(demande) {
   if (demande && typeof demande === 'object') {
@@ -365,6 +442,9 @@ function collecterDepuisPage(demande) {
     if (demande.action === 'fiches') return collecter({ forcer: true, fiches: true });
     if (demande.action === 'auto') return collecter({}); // ouverture du tableau de bord : respecte la fréquence
     if (demande.action === 'suivre') return suivreHotel(demande.nom);
+    if (demande.action === 'zone') return enregistrerZone(demande);
+    if (demande.action === 'ajouterDate') return ajouterDateSejour(demande);
+    if (demande.action === 'retirerDate') return retirerDateSejour(demande.nom);
     return collecter({ forcer: true });
   }
   return collecter({ forcer: !!demande });
@@ -426,6 +506,8 @@ function collecterSansVerrou(opts, journal) {
   const jetonsConnus = {};
   Object.keys(fichesConnues).forEach(h => { if (fichesConnues[h].property_token) jetonsConnus[h] = fichesConnues[h].property_token; });
 
+  if (opts.sejour) sejours = sejours.filter(x => x.nom === opts.sejour);
+  if (!sejours.length) return { ok: false, faite: false, journal: journal.join('\n'), message: 'Séjour « ' + opts.sejour + ' » introuvable ou déjà passé.' };
   let hotels = cfg.hotels;
   if (opts.essai) {
     const choisis = opts.hotel ? hotels.filter(h => ressemblance(h.nom, opts.hotel) >= 0.6) : hotels;
@@ -435,12 +517,14 @@ function collecterSansVerrou(opts, journal) {
 
   // Fiches détaillées (prix site par site) : quelques-unes chaque jour, à tour de rôle ;
   // toutes d'un coup avec le menu « Collecte + fiches détaillées » ; une seule pour un essai
-  const nbFichesVoulues = opts.essai ? 1 : opts.fiches ? hotels.length : cfg.fiches_par_jour;
+  const nbFichesVoulues = opts.sejour ? 0 : opts.essai ? 1 : opts.fiches ? hotels.length : cfg.fiches_par_jour;
+  const nbAvisVoulus = opts.essai || opts.sejour ? 0 : cfg.avis_par_jour; // avis récents : un hôtel par requête, à tour de rôle
 
   // --- Budget : ne jamais dépasser le quota SerpApi ---
-  const budget = budgetCollecte(cfg, compte, sejours, nbFichesVoulues, !!opts.essai, journal);
+  const budget = budgetCollecte(cfg, compte, sejours, nbFichesVoulues, nbAvisVoulus, !!opts.essai, journal);
   if (budget.arret) return { ok: false, faite: false, journal: journal.join('\n'), message: budget.arret };
   sejours = budget.sejours;
+  if (opts.sejour) budget.cibles = 0; // relevé ponctuel d'une seule date
 
   // --- 1) Recherche par date : prix par site + notes, pour tous les hôtels d'un coup ---
   let prix = [];
@@ -527,6 +611,7 @@ function collecterSansVerrou(opts, journal) {
   // --- 3) Fiches détaillées : prix site par site, petit-déjeuner, étoiles, notes détaillées ---
   const taches = choisirFiches(hotels, sejours, infos, jetonsConnus, budget.nbFiches, opts);
   const detailles = [];
+  let notesSites = [], themes = [], avisClients = [];
   if (taches.length) journal.push('> Fiches détaillées (à tour de rôle)');
   taches.forEach(({ hotel: h, sejour: s, jeton }) => {
     let fiche;
@@ -544,11 +629,38 @@ function collecterSansVerrou(opts, journal) {
       prix = prix.filter(l => !(l.hotel === h.nom && l.date_sejour === s.arrivee)).concat(lignes);
     }
     if (fiche.overall_rating) avis[h.nom] = ligneAvis(jour, h.nom, fiche, notesDetaillees(fiche));
+    if (!detailles.includes(h.nom)) { // une seule fois par hôtel et par collecte
+      notesSites = notesSites.concat(lignesNotesSites(jour, h.nom, fiche));
+      themes = themes.concat(lignesThemes(jour, h.nom, fiche));
+    }
     infos[h.nom] = Object.assign({}, infos[h.nom] || {}, fiche, { property_token: jeton });
     detailles.push(h.nom);
     journal.push('  - ' + h.nom + ' (' + s.nom + ') : ' + (lignes.length ? lignes.length + ' site(s)' : 'pas de prix (complet ou fermé ?)')
       + ', note ' + (fiche.overall_rating || '?'));
   });
+
+  // --- 4) Avis récents (les plus récents d'abord) : hôtels à tour de rôle ---
+  if (budget.nbAvis) {
+    const memoire = PropertiesService.getScriptProperties();
+    const jeton = h => (infos[h.nom] && infos[h.nom].property_token) || jetonsConnus[h.nom];
+    const connus = {};
+    lireObjets('avis_clients').forEach(l => { connus[l.hotel + '|' + String(l.extrait).slice(0, 80)] = true; });
+    hotels.filter(jeton)
+      .sort((a, b) => (memoire.getProperty('avis|' + a.nom) || '').localeCompare(memoire.getProperty('avis|' + b.nom) || ''))
+      .slice(0, budget.nbAvis)
+      .forEach(h => {
+        try {
+          const r = appelerSerpapi({ engine: 'google_hotels_reviews', property_token: jeton(h), sort_by: 2 }, etat);
+          memoire.setProperty('avis|' + h.nom, jour);
+          const nouveaux = (r.reviews || []).map(a => ligneAvisClient(jour, h.nom, a))
+            .filter(l => l.extrait && !connus[l.hotel + '|' + l.extrait.slice(0, 80)]);
+          avisClients = avisClients.concat(nouveaux);
+          journal.push('> Avis récents : ' + h.nom + ' : ' + nouveaux.length + ' nouveau(x) sur ' + (r.reviews || []).length);
+        } catch (e) {
+          journal.push('> Avis récents : ' + h.nom + ' : impossible (' + e.message + ')');
+        }
+      });
+  }
 
   // Fiche hôtel : écrite si elle vient d'être détaillée, ou si l'hôtel est nouveau
   const fiches = [];
@@ -559,7 +671,12 @@ function collecterSansVerrou(opts, journal) {
     fiches.push({ date_maj: jour, hotel: h.nom, nom_google: p.name || '', categorie_etoiles: etoiles(p),
       restaurant_sur_place: resto[0], petit_dejeuner_propose: resto[1],
       equipements_principaux: (p.amenities || []).slice(0, 12).join(', '), property_token: p.property_token || '',
-      photo: photo(p), latitude: position(p)[0], longitude: position(p)[1] });
+      photo: photo(p), latitude: position(p)[0], longitude: position(p)[1],
+      adresse: p.address || '', telephone: p.phone || '', heure_arrivee: p.check_in_time || '', heure_depart: p.check_out_time || '',
+      prix_habituel_min: valeurOuVide(((p.typical_price_range || {}).extracted_lowest)),
+      prix_habituel_max: valeurOuVide(((p.typical_price_range || {}).extracted_highest)),
+      note_emplacement_sur_10: typeof p.location_rating === 'number' ? Math.round(20 * p.location_rating) / 10 : '',
+      eco_certifie: p.eco_certified === true ? 'oui' : p.eco_certified === false ? 'non' : '', site_officiel: p.link || '' });
   });
 
   const compteApres = lireCompte();
@@ -595,9 +712,12 @@ function collecterSansVerrou(opts, journal) {
   ajouterLignes('hotels', fiches);
   ajouterLignes('compteur', [ligneCompteur]);
   ajouterLignes('etablissements', etablissements);
+  ajouterLignes('avis_sites', notesSites);
+  ajouterLignes('themes', themes);
+  ajouterLignes('avis_clients', avisClients);
   return { ok: true, faite: true, journal: journal.join('\n'),
     message: 'Collecte enregistrée : ' + prix.length + ' prix, ' + Object.keys(avis).length + ' notes, '
-      + fiches.length + ' fiches.' };
+      + fiches.length + ' fiches' + (avisClients.length ? ', ' + avisClients.length + ' avis récents' : '') + '.' };
 }
 
 
@@ -650,7 +770,7 @@ const PLAFOND_PAR_COLLECTE = 45; // SerpApi accepte 50 requêtes par heure : on 
  *   détaillées, puis le nombre de dates (celles du haut de la liste des Réglages passent en premier).
  * Renvoie { sejours, nbFiches, cibles } ou { arret: 'message' } (cibles : recherches ciblées permises).
  */
-function budgetCollecte(cfg, compte, sejours, nbFichesVoulues, essai, journal) {
+function budgetCollecte(cfg, compte, sejours, nbFichesVoulues, nbAvisVoulus, essai, journal) {
   const restantes = requetesRestantes(cfg, compte);
   const disponible = restantes.valeur - cfg.marge;
   const parDate = cfg.pages_max;
@@ -660,12 +780,19 @@ function budgetCollecte(cfg, compte, sejours, nbFichesVoulues, essai, journal) {
   if (disponible < parDate) {
     return { arret: 'Quota SerpApi atteint (réserve de ' + cfg.marge + ' gardée) : pas de collecte avant le mois prochain.' };
   }
-  let dates = sejours, nbFiches = nbFichesVoulues;
+  let dates = sejours, nbFiches = nbFichesVoulues, nbAvis = nbAvisVoulus;
   if (!essai && projection.total > disponible) {
-    // Le rythme ne tient pas jusqu'à la fin du mois : moins de fiches par jour (voire aucune)
-    nbFiches = Math.min(nbFiches, Math.max(0, Math.floor((disponible - projection.dates) / projection.collectes)));
+    // Le rythme ne tient pas jusqu'à la fin du mois : d'abord moins d'avis récents, puis moins de fiches
+    const parCollecte = Math.max(0, Math.floor((disponible - projection.dates) / projection.collectes));
+    nbFiches = Math.min(nbFiches, parCollecte);
+    nbAvis = Math.min(nbAvis, Math.max(0, parCollecte - nbFiches));
   }
-  nbFiches = Math.min(nbFiches, Math.max(0, Math.min(disponible, PLAFOND_PAR_COLLECTE) - dates.length * parDate));
+  const placeJour = Math.max(0, Math.min(disponible, PLAFOND_PAR_COLLECTE) - dates.length * parDate);
+  nbFiches = Math.min(nbFiches, placeJour);
+  nbAvis = Math.min(nbAvis, placeJour - nbFiches);
+  if (nbAvis < nbAvisVoulus) {
+    journal.push('! Économie de requêtes : ' + nbAvis + ' relevé(s) d\'avis récents sur ' + nbAvisVoulus + " aujourd'hui.");
+  }
   if (nbFiches < nbFichesVoulues) {
     journal.push('! Économie de requêtes : ' + nbFiches + ' fiche(s) détaillée(s) sur ' + nbFichesVoulues + " aujourd'hui.");
   }
@@ -680,9 +807,9 @@ function budgetCollecte(cfg, compte, sejours, nbFichesVoulues, essai, journal) {
     dates = dates.slice(0, garde);
   }
   // Recherches ciblées des hôtels jamais trouvés (2 au plus) : seulement s'il reste de la marge
-  const place = Math.min(disponible, PLAFOND_PAR_COLLECTE) - dates.length * parDate - nbFiches;
+  const place = Math.min(disponible, PLAFOND_PAR_COLLECTE) - dates.length * parDate - nbFiches - nbAvis;
   const cibles = essai ? 0 : Math.max(0, Math.min(2, place, disponible - projection.total - 4));
-  return { sejours: dates, nbFiches: nbFiches, cibles: cibles };
+  return { sejours: dates, nbFiches: nbFiches, nbAvis: nbAvis, cibles: cibles };
 }
 
 /** Requêtes restantes ce mois-ci : { valeur, source }. */
@@ -704,7 +831,8 @@ function projectionMois(cfg, nbDates) {
   const collectes = Math.ceil(joursRestants / Math.max(1, cfg.frequence_jours));
   const dates = collectes * nbDates * cfg.pages_max;
   const fiches = collectes * cfg.fiches_par_jour;
-  return { dates: dates, fiches: fiches, total: dates + fiches, collectes: collectes, joursRestants: joursRestants };
+  const avis = collectes * cfg.avis_par_jour;
+  return { dates: dates, fiches: fiches, avis: avis, total: dates + fiches + avis, collectes: collectes, joursRestants: joursRestants };
 }
 
 
@@ -718,7 +846,7 @@ function cle() {
 
 /** UNE requête Google Hotels (compte pour 1 dans le quota). */
 function appelerSerpapi(params, etat) {
-  const tous = Object.assign({}, params, { engine: 'google_hotels', api_key: cle(), currency: 'EUR', gl: 'fr', hl: 'fr' });
+  const tous = Object.assign({ engine: 'google_hotels', currency: 'EUR', gl: 'fr', hl: 'fr' }, params, { api_key: cle() });
   const url = URL_RECHERCHE + '?' + Object.keys(tous).map(k => k + '=' + encodeURIComponent(tous[k])).join('&');
   const reponse = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
   etat.requetes++;
@@ -885,6 +1013,39 @@ function restauration(p) {
   return [resto, pdj];
 }
 
+/** Notes de l'hôtel sur chaque site : Google (la fiche elle-même) et les autres sites listés par Google. */
+function lignesNotesSites(jour, hotel, fiche) {
+  const lignes = [];
+  if (fiche.overall_rating) {
+    lignes.push({ date_releve: jour, hotel: hotel, source: 'Google', note: fiche.overall_rating, note_max: 5,
+      note_sur_10: Math.round(20 * fiche.overall_rating) / 10, nombre_avis: valeurOuVide(fiche.reviews) });
+  }
+  (fiche.other_reviews || []).forEach(o => {
+    const n = o.source_rating || {};
+    if (!o.source || typeof n.score !== 'number' || !n.max_score) return;
+    lignes.push({ date_releve: jour, hotel: hotel, source: o.source, note: n.score, note_max: n.max_score,
+      note_sur_10: Math.round((100 * n.score) / n.max_score) / 10, nombre_avis: valeurOuVide(o.reviews) });
+  });
+  return lignes;
+}
+
+/** Thèmes des avis : mentions positives, négatives et neutres. */
+function lignesThemes(jour, hotel, fiche) {
+  return (fiche.reviews_breakdown || []).filter(t => t.name && t.total_mentioned).map(t => ({
+    date_releve: jour, hotel: hotel, theme: t.name, mentions: t.total_mentioned, positifs: t.positive || 0,
+    negatifs: t.negative || 0, neutres: t.neutral || 0, pct_positif: Math.round((100 * (t.positive || 0)) / t.total_mentioned),
+  }));
+}
+
+/** Un avis récent, sans le nom de son auteur. */
+function ligneAvisClient(jour, hotel, a) {
+  const sur10 = (x) => (typeof x === 'number' ? Math.round((10 * x) / (a.best_rating || 5) * 10) / 10 : '');
+  const sous = a.subratings || {};
+  return { date_releve: jour, hotel: hotel, source: a.source || '', date_avis: a.date || '', note_sur_10: sur10(a.rating),
+    note_chambres: sur10(sous.rooms), note_service: sur10(sous.service), note_emplacement: sur10(sous.location),
+    reponse_hotel: a.response ? 'oui' : 'non', extrait: String(a.snippet || '').replace(/\s+/g, ' ').trim().slice(0, 600) };
+}
+
 /** Résumé lisible des notes détaillées (étoiles et thèmes des avis). */
 function notesDetaillees(fiche) {
   const morceaux = [];
@@ -947,6 +1108,7 @@ function lireReglages() {
     adultes: nombre('Adultes', 2),
     frequence_jours: nombre('Fréquence (en jours)', 1),
     fiches_par_jour: Math.max(0, Math.round(nombre('Fiches détaillées par jour', 2))),
+    avis_par_jour: Math.max(0, Math.round(nombre('Avis récents par jour', 1))),
     heure: nombre('Heure de la collecte automatique', 7),
     a_l_ouverture: String(parLibelle["Collecter à l'ouverture du classeur"] || 'oui').toLowerCase().trim().startsWith('o'),
     tableau_a_l_ouverture: String(parLibelle["Ouvrir le tableau de bord à l'ouverture"] || 'oui').toLowerCase().trim().startsWith('o'),
