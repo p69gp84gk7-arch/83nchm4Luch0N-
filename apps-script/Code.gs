@@ -8,11 +8,19 @@
  *
  *  - Tous les réglages sont dans l'onglet « Réglages ».
  *  - Tout se pilote depuis le menu « Veille hôtels » du classeur.
- *  - La clé SerpApi est rangée dans les propriétés du script
- *    (menu Veille hôtels > Enregistrer la clé SerpApi), jamais dans le classeur.
+ *  - La clé SerpApi est rangée dans les propriétés du script, jamais dans
+ *    le classeur : collez-la dans la cellule jaune « Clé SerpApi » des
+ *    Réglages (le script la range puis efface la cellule), ou passez par
+ *    le menu Veille hôtels > Enregistrer la clé SerpApi.
+ *
+ *  INSTALLATION : exécutez une fois la fonction « installer » (bouton
+ *  Exécuter de l'éditeur). Elle enregistre la clé, programme les collectes
+ *  et lance la première.
  * =====================================================================
  */
 
+// Le classeur où tout est enregistré (utile quand le script n'est pas attaché au classeur)
+const ID_CLASSEUR = '1LfKdFtpxfyKQj4uiVwkyoXF3FMzfAx1yxvDGMyabLZY';
 const FUSEAU = 'Europe/Paris';
 const URL_RECHERCHE = 'https://serpapi.com/search.json';
 const URL_COMPTE = 'https://serpapi.com/account.json'; // consulter son compte ne coûte rien
@@ -31,8 +39,82 @@ const COLONNES_DATES = ['date_releve', 'date_sejour', 'date_maj'];
 const JOURS = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
 
 
+function classeur() {
+  return SpreadsheetApp.getActive() || SpreadsheetApp.openById(ID_CLASSEUR);
+}
+
+
 // =====================================================================
-//  Menu du classeur
+//  Installation (à exécuter une fois depuis l'éditeur Apps Script)
+// =====================================================================
+
+/**
+ * Fait tout d'un coup : range la clé SerpApi collée dans les Réglages,
+ * la vérifie, programme les collectes automatiques et lance la première.
+ * Le résultat s'affiche dans le journal d'exécution et dans les Réglages.
+ */
+function installer() {
+  rangerCleDesReglages();
+  if (!cle()) {
+    const message = 'Clé SerpApi absente : collez-la dans la cellule jaune « Clé SerpApi » de l\'onglet Réglages, puis relancez « installer ».';
+    noterEtat(message);
+    throw new Error(message);
+  }
+  const compte = lireCompte();
+  if (compte.error || compte.this_month_usage === undefined) {
+    const message = 'Clé refusée par SerpApi : vérifiez le copier-coller. ' + (compte.error || '');
+    noterEtat(message);
+    throw new Error(message);
+  }
+  const auto = programmerCollectes();
+  const r = collecter({ forcer: true });
+  console.log(auto + '\n\n' + r.message + '\n' + r.journal);
+  return r.message;
+}
+
+/** Programme la collecte quotidienne (et à l'ouverture du classeur si demandé). */
+function programmerCollectes() {
+  const cfg = lireReglages();
+  supprimerDeclencheurs();
+  ScriptApp.newTrigger('collecteAutomatique').timeBased()
+    .everyDays(1).atHour(cfg.heure).inTimezone(FUSEAU).create();
+  if (cfg.a_l_ouverture) {
+    ScriptApp.newTrigger('collecteALouverture').forSpreadsheet(ID_CLASSEUR).onOpen().create();
+  }
+  return 'Automatisation activée :\n'
+    + '- collecte chaque jour vers ' + cfg.heure + ' h (heure de Paris)\n'
+    + (cfg.a_l_ouverture ? "- et à l'ouverture du classeur si celle du jour n'est pas encore faite\n" : '')
+    + '\nUne seule collecte par jour : rouvrir le classeur ne coûte rien de plus.';
+}
+
+/** Si une clé a été collée dans la cellule « Clé SerpApi » des Réglages : la ranger, puis effacer la cellule. */
+function rangerCleDesReglages() {
+  const cellule = celluleReglage('Clé SerpApi');
+  if (!cellule) return;
+  const valeur = String(cellule.getValue()).trim();
+  if (!valeur || valeur.startsWith('(')) return;
+  PropertiesService.getScriptProperties().setProperty('SERPAPI_KEY', valeur);
+  cellule.setValue('(enregistrée dans le script)');
+}
+
+/** Écrit l'état de la dernière collecte dans les Réglages, pour le voir sans ouvrir le script. */
+function noterEtat(message) {
+  const cellule = celluleReglage('Dernière collecte');
+  if (cellule) cellule.setValue(Utilities.formatDate(new Date(), FUSEAU, 'dd/MM/yyyy HH:mm') + ' : ' + message);
+}
+
+/** Cellule de valeur (colonne B) d'un libellé de la colonne A des Réglages. */
+function celluleReglage(libelle) {
+  const feuille = classeur().getSheetByName('Réglages');
+  if (!feuille) return null;
+  const libelles = feuille.getRange(1, 1, feuille.getLastRow(), 1).getValues();
+  const i = libelles.findIndex(l => String(l[0]).trim() === libelle);
+  return i < 0 ? null : feuille.getRange(i + 1, 2);
+}
+
+
+// =====================================================================
+//  Menu du classeur (quand le script est attaché au classeur)
 // =====================================================================
 
 function onOpen() {
@@ -83,17 +165,7 @@ function menuCle() {
 }
 
 function menuActiver() {
-  const cfg = lireReglages();
-  supprimerDeclencheurs();
-  ScriptApp.newTrigger('collecteAutomatique').timeBased()
-    .everyDays(1).atHour(cfg.heure).inTimezone(FUSEAU).create();
-  if (cfg.a_l_ouverture) {
-    ScriptApp.newTrigger('collecteALouverture').forSpreadsheet(SpreadsheetApp.getActive()).onOpen().create();
-  }
-  SpreadsheetApp.getUi().alert('Automatisation activée :\n\n'
-    + '- collecte chaque jour vers ' + cfg.heure + ' h (heure de Paris)\n'
-    + (cfg.a_l_ouverture ? "- et à l'ouverture du classeur si celle du jour n'est pas encore faite\n" : '')
-    + '\nUne seule collecte par jour : rouvrir le classeur ne coûte rien de plus.');
+  SpreadsheetApp.getUi().alert(programmerCollectes());
 }
 
 function menuDesactiver() {
@@ -119,18 +191,23 @@ function afficherResultat(r) {
 
 /** Lancé chaque jour à l'heure choisie (respecte la fréquence des Réglages). */
 function collecteAutomatique() {
+  rangerCleDesReglages();
   const r = collecter({});
   console.log(r.message + '\n' + r.journal);
 }
 
 /** Lancé à l'ouverture du classeur : collecte seulement si celle du jour n'est pas faite. */
 function collecteALouverture() {
+  rangerCleDesReglages();
   const cfg = lireReglages();
   if (!cfg.a_l_ouverture || !cle() || derniereCollecte() === aujourdhui()) return;
-  const classeur = SpreadsheetApp.getActive();
-  classeur.toast('Collecte du jour en cours (environ 1 minute)…', 'Veille hôtels', 60);
+  message('Collecte du jour en cours (environ 1 minute)…', 60);
   const r = collecter({});
-  classeur.toast(r.message, 'Veille hôtels', 10);
+  message(r.message, 10);
+}
+
+function message(texte, secondes) {
+  try { classeur().toast(texte, 'Veille hôtels', secondes); } catch (e) { console.log(texte); }
 }
 
 
@@ -148,7 +225,7 @@ function doGet() {
 function lireDonnees() {
   return {
     prix: lireObjets('prix'), avis: lireObjets('avis'), hotels: lireObjets('hotels'),
-    usage: lireObjets('compteur'), urlClasseur: SpreadsheetApp.getActive().getUrl(),
+    usage: lireObjets('compteur'), urlClasseur: classeur().getUrl(),
   };
 }
 
@@ -173,10 +250,15 @@ function collecter(options) {
   const verrou = LockService.getScriptLock();
   if (!verrou.tryLock(1000)) return { ok: false, faite: false, message: 'Une collecte est déjà en cours.', journal: '' };
   const journal = [];
+  let r;
   try {
-    return collecterSansVerrou(options || {}, journal);
+    r = collecterSansVerrou(options || {}, journal);
   } catch (e) {
-    return { ok: false, faite: false, message: 'Erreur : ' + e.message, journal: journal.join('\n') };
+    r = { ok: false, faite: false, message: 'Erreur : ' + e.message, journal: journal.join('\n') };
+  }
+  try {
+    if (!(options || {}).essai) noterEtat(r.message);
+    return r;
   } finally {
     verrou.releaseLock();
   }
@@ -533,7 +615,7 @@ function etoiles(p) {
 
 /** Lit l'onglet Réglages (les libellés de la colonne A, puis les listes d'hôtels et de dates). */
 function lireReglages() {
-  const feuille = SpreadsheetApp.getActive().getSheetByName('Réglages');
+  const feuille = classeur().getSheetByName('Réglages');
   if (!feuille) throw new Error('Onglet « Réglages » introuvable.');
   const valeurs = feuille.getDataRange().getValues();
   const parLibelle = {};
@@ -606,8 +688,7 @@ function valeurOuVide(v) { return v === undefined || v === null ? '' : v; }
 
 function feuilleDonnees(cleOnglet) {
   const [nom, colonnes] = ONGLETS[cleOnglet];
-  const classeur = SpreadsheetApp.getActive();
-  const feuille = classeur.getSheetByName(nom) || classeur.insertSheet(nom);
+  const feuille = classeur().getSheetByName(nom) || classeur().insertSheet(nom);
   if (feuille.getLastRow() === 0) {
     feuille.getRange(1, 1, 1, colonnes.length).setValues([colonnes]).setFontWeight('bold');
     feuille.setFrozenRows(1);

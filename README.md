@@ -42,52 +42,45 @@ Le dépôt sert à garder le code et son historique. Ce qui tourne vraiment, c'e
 
 ---
 
-## Installation pas à pas
+## Installation : 3 gestes (environ 5 minutes)
 
-### 1. Créer un compte SerpApi (gratuit)
+Le classeur est déjà prêt (onglets, réglages, synthèse). Google ne permet à personne d'autre que vous
+d'installer un script dans votre compte : ces 3 gestes sont le minimum.
 
-1. Créez un compte sur <https://serpapi.com/users/sign_up> (offre **Free**).
+### 1. Créer le compte SerpApi et coller la clé
+
+1. Créez un compte gratuit sur <https://serpapi.com/users/sign_up> (offre **Free** : 250 requêtes par mois ; le réglage de départ en utilise ~155).
 2. Copiez votre clé sur <https://serpapi.com/manage-api-key>.
+3. Dans le classeur, onglet **Réglages**, collez-la dans la cellule jaune **Clé SerpApi**.
+   (Le script la rangera en lieu sûr et effacera la cellule.)
 
-> Offre gratuite (vérifiée en octobre 2026) : **250 requêtes par mois**. Le réglage de départ en utilise environ **155**.
+### 2. Coller le script
 
-### 2. Coller le script dans le classeur
+1. Ouvrez <https://raw.githubusercontent.com/p69gp84gk7-arch/83nchm4Luch0N-/main/apps-script/Code.gs>, sélectionnez tout (Ctrl+A ou Cmd+A) et copiez.
+2. Dans le classeur : menu **Extensions → Apps Script**.
+3. Dans `Code.gs` : effacez tout, collez, puis **enregistrez** (icône disquette).
 
-1. Ouvrez le classeur **Veille hôtels Luchon – base de données**.
-2. Menu **Extensions → Apps Script**.
-3. Dans le fichier `Code.gs` qui s'ouvre : effacez tout, puis collez le contenu de [`apps-script/Code.gs`](apps-script/Code.gs).
-4. À gauche, **+** → **HTML**, nommez-le exactement `Page` (sans « .html »), effacez tout et collez le contenu de [`apps-script/Page.html`](apps-script/Page.html).
-5. **Enregistrez** (icône disquette), puis revenez au classeur et **rechargez la page** : un menu **Veille hôtels** apparaît.
+### 3. Cliquer sur « Exécuter »
 
-### 3. Enregistrer la clé
+1. En haut de l'éditeur, dans la liste des fonctions, choisissez **installer**, puis cliquez **Exécuter**.
+2. Google demande d'autoriser le script (comme pour vos autres scripts) :
+   **Examiner les autorisations → votre compte → Paramètres avancés → Accéder à … (non sécurisé) → Autoriser**.
+3. En une minute, le script :
+   - range la clé et la vérifie ;
+   - programme la collecte **chaque jour** (7 h) et **à l'ouverture du classeur** si celle du jour n'est pas faite ;
+   - lance la **première collecte** : les onglets Prix, Avis, Hôtels et la Synthèse se remplissent.
 
-Menu **Veille hôtels → Enregistrer la clé SerpApi**, collez la clé.
-La première fois, Google demande d'autoriser le script (comme pour vos autres scripts) :
-**Continuer → choisir votre compte → Paramètres avancés → Accéder à … (non sécurisé) → Autoriser**.
-Le script vérifie la clé et affiche le compteur de requêtes.
+Le résultat s'affiche dans le journal en bas de l'éditeur et dans la case **Dernière collecte** des Réglages.
+C'est fini : plus rien à faire. Rechargez le classeur pour voir aussi le menu **Veille hôtels**.
 
-### 4. Faire l'essai
+### (Facultatif) La page web avec graphique et comparateur
 
-Menu **Veille hôtels → Essai**. Laissez vide pour tester le premier hôtel de la liste.
-Le résultat s'affiche (prix par site, note, restauration), **rien n'est enregistré**. Coût : 2 requêtes.
-
-### 5. Première collecte et automatisation
-
-1. Menu **Veille hôtels → Lancer la collecte maintenant** : les onglets se remplissent.
-2. Menu **Veille hôtels → Activer l'automatisation** :
-   - collecte **chaque jour** à l'heure choisie dans Réglages (7 h par défaut) ;
-   - et **à l'ouverture du classeur** si celle du jour n'est pas encore faite (réglage « Collecter à l'ouverture du classeur »).
-
-Une seule collecte par jour : rouvrir le classeur dix fois ne coûte rien de plus.
-
-### 6. (Facultatif) La page web
-
-Dans l'éditeur Apps Script : **Déployer → Nouveau déploiement** → type **Application Web** →
-« Exécuter en tant que » : **Moi**, « Qui a accès » : **Moi uniquement** → **Déployer**.
-Copiez l'adresse (elle finit par `/exec`) et mettez-la dans vos favoris, sur téléphone aussi.
+1. Dans l'éditeur Apps Script : **+** → **HTML**, nommez-le exactement `Page`, collez le contenu de
+   <https://raw.githubusercontent.com/p69gp84gk7-arch/83nchm4Luch0N-/main/apps-script/Page.html>, enregistrez.
+2. **Déployer → Nouveau déploiement** → type **Application Web** → « Exécuter en tant que » : **Moi**,
+   « Qui a accès » : **Moi uniquement** → **Déployer**. Gardez l'adresse (elle finit par `/exec`) dans vos favoris.
 
 À l'ouverture, la page lance la collecte du jour si elle n'est pas faite, puis se met à jour toute seule.
-Le bouton **Relancer maintenant** force une nouvelle collecte (avec confirmation).
 
 > Après une modification du script, la page garde l'ancienne version tant que vous n'avez pas fait
 > **Déployer → Gérer les déploiements → ✏️ → Version : Nouvelle version → Déployer**.
@@ -102,7 +95,7 @@ Le bouton **Relancer maintenant** force une nouvelle collecte (avec confirmation
 | Essai | 1 hôtel, 1 date, n'enregistre rien | 2 requêtes |
 | Collecte + fiches détaillées | Collecte complète + fiches de tous les hôtels | ~12 requêtes |
 | Voir le compteur SerpApi | Requêtes utilisées et restantes ce mois-ci | gratuit |
-| Enregistrer la clé SerpApi | Colle ou remplace la clé | gratuit |
+| Enregistrer la clé SerpApi | Remplace la clé (ou collez-la dans Réglages) | gratuit |
 | Activer / Désactiver l'automatisation | Collecte quotidienne et à l'ouverture | — |
 
 ---
