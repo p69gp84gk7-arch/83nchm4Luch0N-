@@ -34,7 +34,11 @@ const ONGLETS = {
   prix: ['Prix', ['date_releve', 'hotel', 'sejour', 'date_sejour', 'site', 'prix_nuit_eur', 'offre', 'lien']],
   avis: ['Avis', ['date_releve', 'hotel', 'note', 'note_sur_10', 'nombre_avis', 'notes_detaillees']],
   hotels: ['Hôtels', ['date_maj', 'hotel', 'nom_google', 'categorie_etoiles', 'restaurant_sur_place',
-                      'petit_dejeuner_propose', 'equipements_principaux', 'property_token', 'photo']],
+                      'petit_dejeuner_propose', 'equipements_principaux', 'property_token', 'photo',
+                      'latitude', 'longitude']],
+  // Tous les établissements renvoyés par Google (suivis ou non), pour la carte : un relevé par collecte
+  etablissements: ['Établissements', ['date_releve', 'nom', 'type', 'latitude', 'longitude', 'prix_nuit_eur',
+                                      'note_sur_10', 'nombre_avis', 'hotel_suivi']],
   compteur: ['Compteur', ['date_releve', 'requetes_ce_lancement', 'requetes_ce_mois', 'quota_mois',
                           'requetes_restantes']],
 };
@@ -289,9 +293,15 @@ function lireDonnees() {
       hotels: cfg.hotels.map(h => h.nom),
       dates: datesValides(cfg, []).map(d => ({ nom: d.nom, arrivee: d.arrivee })),
       heure: cfg.heure, frequence_jours: cfg.frequence_jours, fiches_par_jour: cfg.fiches_par_jour,
-      a_l_ouverture: cfg.a_l_ouverture, quota: cfg.quota,
+      a_l_ouverture: cfg.a_l_ouverture, quota: cfg.quota, zone: cfg.zone,
     },
     journal: lireJournal(15),
+    etablissements: (() => {
+      // Le dernier relevé seulement
+      const tous = lireObjets('etablissements');
+      const dernier = tous.reduce((m, l) => (l.date_releve > m ? l.date_releve : m), '');
+      return tous.filter(l => l.date_releve === dernier);
+    })(),
     budget: (() => {
       const dernier = lireObjets('compteur').pop();
       const compte = dernier && dernier.requetes_restantes !== '' ? { plan_searches_left: Number(dernier.requetes_restantes) } : {};
@@ -414,11 +424,22 @@ function collecterSansVerrou(opts, journal) {
 
   // --- 1) Recherche par date : prix par site + notes, pour tous les hôtels d'un coup ---
   let prix = [];
-  const avis = {}, infos = {};
-  sejours.forEach(s => {
+  const avis = {}, infos = {}, etablissements = [];
+  sejours.forEach((s, rang) => {
     journal.push('> ' + s.nom + ' (arrivée ' + s.arrivee + ')');
     const proprietes = rechercherVille(cfg, s.arrivee, s.depart, etat);
     const trouves = associerHotels(hotels, proprietes, jetonsConnus);
+    if (rang === 0) {
+      // Pour la carte : tous les établissements trouvés par Google, suivis ou non (prix pour la première date)
+      const suivi = new Map(Object.keys(trouves).map(nom => [trouves[nom], nom]));
+      proprietes.forEach(p => {
+        const [lat, lng] = position(p);
+        if (lat === '') return;
+        etablissements.push({ date_releve: jour, nom: p.name || '', type: p.type || '', latitude: lat, longitude: lng,
+          prix_nuit_eur: valeurOuVide(prixNuit(p)), note_sur_10: p.overall_rating ? Math.round(20 * p.overall_rating) / 10 : '',
+          nombre_avis: valeurOuVide(p.reviews), hotel_suivi: suivi.get(p) || '' });
+      });
+    }
     hotels.forEach(h => {
       const p = trouves[h.nom];
       if (!p) { journal.push('  - ' + h.nom + ' : non trouvé (complet, ou nom à préciser dans Réglages)'); return; }
@@ -505,7 +526,7 @@ function collecterSansVerrou(opts, journal) {
     fiches.push({ date_maj: jour, hotel: h.nom, nom_google: p.name || '', categorie_etoiles: etoiles(p),
       restaurant_sur_place: resto[0], petit_dejeuner_propose: resto[1],
       equipements_principaux: (p.amenities || []).slice(0, 12).join(', '), property_token: p.property_token || '',
-      photo: photo(p) });
+      photo: photo(p), latitude: position(p)[0], longitude: position(p)[1] });
   });
 
   const compteApres = lireCompte();
@@ -540,6 +561,7 @@ function collecterSansVerrou(opts, journal) {
   ajouterLignes('avis', Object.keys(avis).map(h => avis[h]));
   ajouterLignes('hotels', fiches);
   ajouterLignes('compteur', [ligneCompteur]);
+  ajouterLignes('etablissements', etablissements);
   return { ok: true, faite: true, journal: journal.join('\n'),
     message: 'Collecte enregistrée : ' + prix.length + ' prix, ' + Object.keys(avis).length + ' notes, '
       + fiches.length + ' fiches.' };
@@ -841,6 +863,12 @@ function notesDetaillees(fiche) {
   return morceaux.join(' ; ');
 }
 
+/** Position GPS [latitude, longitude] d'un établissement Google Hotels ('' si inconnue). */
+function position(p) {
+  const g = p.gps_coordinates || {};
+  return typeof g.latitude === 'number' && typeof g.longitude === 'number' ? [g.latitude, g.longitude] : ['', ''];
+}
+
 function photo(p) {
   const image = (p.images || [])[0] || {};
   return image.thumbnail || image.original_image || '';
@@ -889,12 +917,20 @@ function lireReglages() {
     heure: nombre('Heure de la collecte automatique', 7),
     a_l_ouverture: String(parLibelle["Collecter à l'ouverture du classeur"] || 'oui').toLowerCase().trim().startsWith('o'),
     tableau_a_l_ouverture: String(parLibelle["Ouvrir le tableau de bord à l'ouverture"] || 'oui').toLowerCase().trim().startsWith('o'),
+    zone: zoneDeCollecte(parLibelle['Zone de collecte : centre (latitude, longitude)'], nombre('Zone de collecte : rayon (km)', 2)),
     quota: nombre('Quota mensuel SerpApi', 250),
     marge: nombre('Réserve de requêtes', 15),
     pages_max: Math.max(1, nombre('Pages de résultats par date', 1)),
     hotels: hotels,
     dates: dates,
   };
+}
+
+/** Zone de collecte pour la carte : un cercle (centre et rayon). Par défaut, le centre de Bagnères-de-Luchon. */
+function zoneDeCollecte(texteCentre, rayonKm) {
+  const nombres = String(texteCentre || '').replace(/,(?=\d)/g, '.').match(/-?\d+(\.\d+)?/g) || [];
+  const [lat, lng] = nombres.length >= 2 ? [Number(nombres[0]), Number(nombres[1])] : [42.7906, 0.5947];
+  return { latitude: lat, longitude: lng, rayon_km: rayonKm > 0 ? rayonKm : 2 };
 }
 
 /** Transforme les dates des Réglages en vraies dates, en ignorant les dates passées. */

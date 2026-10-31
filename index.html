@@ -178,6 +178,22 @@
   .budget.ok strong { color: var(--baisse); }
   .budget.attention strong { color: var(--attention); }
   .vide { color: var(--texte-2); padding: 24px 0; text-align: center; }
+  /* ---------- Carte ---------- */
+  .grille-carte { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
+  @media (max-width: 820px) { .grille-carte { grid-template-columns: 1fr; } }
+  #carte { height: 560px; border-radius: 12px; border: 1px solid var(--trait); background: var(--carte-2); z-index: 0; }
+  @media (max-width: 600px) { #carte { height: 420px; } }
+  .liste-carte { list-style: none; margin: 8px 0 0; padding: 0; font-size: 0.9rem; }
+  .liste-carte li { display: flex; gap: 8px; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--trait); cursor: pointer; }
+  .liste-carte li .droite { margin-left: auto; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .hors-zone { color: var(--attention); font-size: 0.8rem; }
+  .leaflet-popup-content { font: 0.88rem/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; margin: 10px 12px; }
+  .leaflet-popup-content strong { font-size: 0.95rem; }
+  .legende-carte { display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.82rem; color: var(--texte-2); margin-top: 8px; }
+  .legende-carte span { display: inline-flex; align-items: center; gap: 6px; }
+  .rond { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px var(--trait); }
+  .zone-echantillon { display: inline-block; width: 16px; height: 12px; border-radius: 3px; border: 2px solid var(--accent); background: var(--accent-fond); }
+
   #toast {
     position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); background: var(--texte); color: var(--fond);
     padding: 9px 14px; border-radius: 10px; font-size: 0.9rem; max-width: calc(100vw - 32px); opacity: 0; transition: opacity 0.2s; pointer-events: none;
@@ -204,6 +220,7 @@
     <button class="onglet" role="tab" data-vue="apercu" aria-selected="true">Aperçu</button>
     <button class="onglet" role="tab" data-vue="evolution" aria-selected="false">Évolution</button>
     <button class="onglet" role="tab" data-vue="comparer" aria-selected="false">Comparer</button>
+    <button class="onglet" role="tab" data-vue="carte" aria-selected="false">Carte</button>
     <button class="onglet" role="tab" data-vue="pilotage" aria-selected="false">Pilotage</button>
   </nav>
 
@@ -255,6 +272,29 @@
     <p class="aide">Choisissez 2 hôtels ou plus : derniers prix relevés pour le séjour choisi, site par site.</p>
     <div class="choix" id="choix"></div>
     <div class="comparaison" id="comparaison"></div>
+  </section>
+
+  <!-- ===== Carte ===== -->
+  <section id="v-carte" hidden>
+    <div class="grille-carte">
+      <div>
+        <div id="carte" role="region" aria-label="Carte des hôtels et de la zone de collecte"></div>
+        <div class="legende-carte">
+          <span><span class="zone-echantillon"></span>Zone de collecte</span>
+          <span><span class="rond" style="background:var(--s1)"></span>Hôtel suivi (sa couleur)</span>
+          <span><span class="rond" style="background:#8a8984;width:9px;height:9px"></span>Autre établissement trouvé par Google</span>
+        </div>
+      </div>
+      <div class="bloc" style="margin:0">
+        <h2>Dans la zone</h2>
+        <p class="discret" id="carte-resume"></p>
+        <strong style="font-size:.9rem">Hôtels suivis</strong>
+        <ul class="liste-carte" id="carte-suivis"></ul>
+        <strong style="font-size:.9rem;display:block;margin-top:12px">Autres établissements</strong>
+        <p class="aide" style="margin:2px 0 0">Concurrents trouvés par Google au dernier relevé, non suivis. Pour en suivre un, ajoutez son nom dans les Réglages.</p>
+        <ul class="liste-carte" id="carte-autres"></ul>
+      </div>
+    </div>
   </section>
 
   <!-- ===== Pilotage ===== -->
@@ -327,7 +367,7 @@
 //  Les données viennent du script du classeur (Code.gs) via google.script.run.
 // =====================================================================
 const etat = {
-  prix: [], avis: [], hotels: [], usage: [], reglages: { hotels: [], dates: [] }, journal: [], infos: {},
+  prix: [], avis: [], hotels: [], usage: [], reglages: { hotels: [], dates: [] }, journal: [], infos: {}, etablissements: [],
   sejour: null, vue: "apercu", modeCourbes: "hotel", choisis: new Set(), tri: { col: "dernier", asc: true },
 };
 const $ = (id) => document.getElementById(id);
@@ -709,6 +749,116 @@ $("choix").addEventListener("click", (e) => {
   dessinerComparer();
 });
 
+// ------------------------- Carte -------------------------
+// Leaflet (carte OpenStreetMap) n'est chargé qu'à la première ouverture de l'onglet
+let carte = null, coucheCarte = null, chargementLeaflet = null;
+function chargerLeaflet() {
+  if (window.L) return Promise.resolve();
+  if (chargementLeaflet) return chargementLeaflet;
+  chargementLeaflet = new Promise((ok, ko) => {
+    const css = document.createElement("link");
+    css.rel = "stylesheet";
+    css.href = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css";
+    document.head.appendChild(css);
+    const js = document.createElement("script");
+    js.src = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js";
+    js.onload = ok;
+    js.onerror = () => ko(new Error("carte indisponible (pas de connexion ?)"));
+    document.head.appendChild(js);
+  });
+  return chargementLeaflet;
+}
+
+// Distance en km entre deux points (formule de haversine)
+function distanceKm(a, b) {
+  const rad = (x) => (x * Math.PI) / 180, R = 6371;
+  const dLat = rad(b[0] - a[0]), dLng = rad(b[1] - a[1]);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a[0])) * Math.cos(rad(b[0])) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+const km = (d) => (d < 1 ? Math.round(d * 1000) + " m" : d.toFixed(1).replace(".", ",") + " km");
+
+// Position d'un hôtel suivi : sa dernière fiche, sinon le dernier relevé des établissements
+function positionHotel(h) {
+  const f = etat.infos[h] || {};
+  if (f.latitude !== "" && f.latitude != null && !isNaN(nombre(f.latitude))) return [nombre(f.latitude), nombre(f.longitude)];
+  const e = etat.etablissements.find((x) => x.hotel_suivi === h);
+  return e ? [nombre(e.latitude), nombre(e.longitude)] : null;
+}
+
+async function dessinerCarte() {
+  try { await chargerLeaflet(); } catch (e) { $("carte").innerHTML = `<p class="vide">${echapper(e.message)}</p>`; return; }
+  const z = etat.reglages.zone || { latitude: 42.7906, longitude: 0.5947, rayon_km: 2 };
+  const centre = [z.latitude, z.longitude];
+  const css = getComputedStyle(document.documentElement);
+  if (!carte) {
+    carte = L.map("carte", { scrollWheelZoom: false }).setView(centre, 14);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>',
+    }).addTo(carte);
+  }
+  setTimeout(() => carte.invalidateSize(), 50); // l'onglet vient d'apparaître
+  if (coucheCarte) coucheCarte.remove();
+  coucheCarte = L.layerGroup().addTo(carte);
+
+  // La zone de collecte : une surface autour du centre
+  const accent = css.getPropertyValue("--accent").trim();
+  const zone = L.circle(centre, { radius: z.rayon_km * 1000, color: accent, weight: 2, fillColor: accent, fillOpacity: 0.1 })
+    .bindTooltip(`Zone de collecte : ${km(z.rayon_km)} autour du centre`, { sticky: true }).addTo(coucheCarte);
+  L.circleMarker(centre, { radius: 3, color: accent, fillColor: accent, fillOpacity: 1, weight: 1 }).bindTooltip("Centre de la zone").addTo(coucheCarte);
+
+  const series = seriesSejour(etat.sejour);
+  const points = [];
+  // Autres établissements (gris, plus petits, dessous)
+  const autres = etat.etablissements.filter((e) => !e.hotel_suivi).map((e) => ({ ...e, pos: [nombre(e.latitude), nombre(e.longitude)] }))
+    .filter((e) => !isNaN(e.pos[0]));
+  autres.forEach((e) => {
+    e.distance = distanceKm(centre, e.pos);
+    points.push(e.pos);
+    L.circleMarker(e.pos, { radius: 6, color: css.getPropertyValue("--carte").trim(), weight: 2, fillColor: "#8a8984", fillOpacity: 0.9 })
+      .bindPopup(`<strong>${echapper(e.nom)}</strong><br>${e.type ? echapper(e.type) + " · " : ""}non suivi<br>
+        ${e.prix_nuit_eur !== "" ? "Dès " + euros(nombre(e.prix_nuit_eur)) + " / nuit (1re date)" : "Pas de prix"}
+        ${e.note_sur_10 !== "" ? "<br>Note " + String(e.note_sur_10).replace(".", ",") + " /10" + (e.nombre_avis !== "" ? " (" + e.nombre_avis + " avis)" : "") : ""}
+        <br><span style="color:#75746f">${km(e.distance)} du centre</span>`).addTo(coucheCarte);
+  });
+  // Hôtels suivis (couleur de l'hôtel, au-dessus)
+  const suivis = etat.ordreHotels.map((h) => ({ h, pos: positionHotel(h) }));
+  const marqueurs = {};
+  suivis.filter((x) => x.pos).forEach(({ h, pos }) => {
+    const s = series[h], n = noteSur10(h), d = distanceKm(centre, pos);
+    points.push(pos);
+    marqueurs[h] = L.circleMarker(pos, { radius: 10, color: "#fff", weight: 3, fillColor: couleur(h), fillOpacity: 1 })
+      .bindPopup(`<strong>${echapper(h)}</strong><br>
+        ${s ? "<b>" + euros(s.dernier.prix) + "</b> / nuit sur " + echapper(s.dernier.site) + " (" + echapper(etat.sejour) + ")" : "Pas de prix pour " + echapper(etat.sejour)}
+        ${n && !isNaN(n.note) ? "<br>Note " + n.note.toFixed(1).replace(".", ",") + " /10" : ""}
+        <br><span style="color:#75746f">${km(d)} du centre${d > z.rayon_km ? " · hors zone" : ""}</span>`).addTo(coucheCarte);
+  });
+  // Cadrage : la zone et tous les points
+  const cadre = zone.getBounds();
+  points.forEach((pt) => cadre.extend(pt));
+  carte.fitBounds(cadre, { padding: [20, 20], maxZoom: 16 });
+
+  // Listes
+  const dansZone = (pos) => distanceKm(centre, pos) <= z.rayon_km;
+  const connus = suivis.filter((x) => x.pos);
+  $("carte-resume").textContent = `Rayon de ${km(z.rayon_km)} · ${connus.filter((x) => dansZone(x.pos)).length} hôtel(s) suivi(s) et ${autres.filter((e) => dansZone(e.pos)).length} autre(s) établissement(s) dans la zone.`;
+  $("carte-suivis").innerHTML = suivis.map(({ h, pos }) => {
+    const s = series[h];
+    const lieu = pos ? km(distanceKm(centre, pos)) + (dansZone(pos) ? "" : ` <span class="hors-zone">hors zone</span>`) : `<span class="discret">position inconnue pour l'instant</span>`;
+    return `<li data-hotel="${echapper(h)}"><span class="puce" style="background:${couleur(h)}"></span><span>${echapper(h)}<br><span class="discret">${lieu}</span></span>
+      <span class="droite">${s ? euros(s.dernier.prix) : "—"}</span></li>`;
+  }).join("");
+  const autresTries = autres.filter((e) => dansZone(e.pos)).sort((a, b) => a.distance - b.distance);
+  $("carte-autres").innerHTML = autresTries.length ? autresTries.map((e) =>
+    `<li><span class="puce" style="background:#8a8984"></span><span>${echapper(e.nom)}<br><span class="discret">${km(e.distance)}${e.note_sur_10 !== "" ? " · " + String(e.note_sur_10).replace(".", ",") + "/10" : ""}</span></span>
+      <span class="droite">${e.prix_nuit_eur !== "" ? euros(nombre(e.prix_nuit_eur)) : "—"}</span></li>`).join("")
+    : `<li class="discret" style="cursor:default">Aucun pour l'instant : la liste se remplit à la prochaine collecte.</li>`;
+  $("carte-suivis").onclick = (ev) => {
+    const li = ev.target.closest("[data-hotel]");
+    if (li && marqueurs[li.dataset.hotel]) { carte.setView(marqueurs[li.dataset.hotel].getLatLng(), 16); marqueurs[li.dataset.hotel].openPopup(); }
+  };
+}
+
 // ------------------------- Pilotage -------------------------
 function dessinerPilotage(d) {
   $("p-derniere").textContent = "Dernière collecte : " + (d.etat.derniereCollecte || "aucune");
@@ -791,8 +941,9 @@ document.querySelector(".onglets").addEventListener("click", (e) => {
 function toutDessiner() {
   const vide = !etat.prix.length;
   dessinerSejours();
-  $("vide").hidden = !(vide && etat.vue !== "pilotage");
-  ["apercu", "evolution", "comparer", "pilotage"].forEach((v) => ($("v-" + v).hidden = v !== etat.vue || (vide && v !== "pilotage")));
+  $("vide").hidden = !(vide && etat.vue !== "pilotage" && etat.vue !== "carte");
+  ["apercu", "evolution", "comparer", "carte", "pilotage"].forEach((v) => ($("v-" + v).hidden = v !== etat.vue || (vide && v !== "pilotage" && v !== "carte")));
+  if (etat.vue === "carte") { dessinerCarte(); return; }
   if (vide && etat.vue !== "pilotage") return;
   if (etat.vue === "apercu") dessinerApercu();
   if (etat.vue === "evolution") { dessinerGraphique(); dessinerTableau(); }
@@ -803,7 +954,8 @@ let derniereDonnees = null;
 async function charger() {
   const d = await serveur("lireDonnees");
   derniereDonnees = d;
-  Object.assign(etat, { prix: d.prix, avis: d.avis, hotels: d.hotels, usage: d.usage, reglages: d.reglages, journal: d.journal });
+  Object.assign(etat, { prix: d.prix, avis: d.avis, hotels: d.hotels, usage: d.usage, reglages: d.reglages, journal: d.journal,
+    etablissements: d.etablissements || [] });
   etat.infos = {};
   d.hotels.forEach((l) => { etat.infos[l.hotel] = l; });
   etat.ordreHotels = [...new Set([...d.reglages.hotels, ...d.prix.map((l) => l.hotel)])];
