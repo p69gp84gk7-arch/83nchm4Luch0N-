@@ -32,7 +32,7 @@ const ONGLETS = {
   prix: ['Prix', ['date_releve', 'hotel', 'sejour', 'date_sejour', 'site', 'prix_nuit_eur', 'offre', 'lien']],
   avis: ['Avis', ['date_releve', 'hotel', 'note', 'note_sur_10', 'nombre_avis', 'notes_detaillees']],
   hotels: ['Hôtels', ['date_maj', 'hotel', 'nom_google', 'categorie_etoiles', 'restaurant_sur_place',
-                      'petit_dejeuner_propose', 'equipements_principaux', 'property_token']],
+                      'petit_dejeuner_propose', 'equipements_principaux', 'property_token', 'photo']],
   compteur: ['Compteur', ['date_releve', 'requetes_ce_lancement', 'requetes_ce_mois', 'quota_mois',
                           'requetes_restantes']],
 };
@@ -129,11 +129,13 @@ function menuEssai() {
   afficherResultat(collecter({ essai: true, hotel: rep.getResponseText().trim() }));
 }
 
-function menuQuota() {
-  const ui = SpreadsheetApp.getUi();
-  if (!cle()) return ui.alert("Aucune clé SerpApi enregistrée : menu Veille hôtels > Enregistrer la clé SerpApi.");
-  const compte = lireCompte();
-  ui.alert('Compteur SerpApi', texteQuota(compte) || 'Compteur illisible pour le moment.', ui.ButtonSet.OK);
+/** Menu « Voir le compteur SerpApi » : ouvre le tableau de bord, qui affiche le compteur en haut. */
+function menuQuota() { ouvrirTableauDeBord(); }
+
+/** Ouvre le tableau de bord dans une grande fenêtre par-dessus le classeur. */
+function ouvrirTableauDeBord() {
+  const page = HtmlService.createHtmlOutput(UrlFetchApp.fetch(URL_PAGE).getContentText()).setWidth(1200).setHeight(820);
+  SpreadsheetApp.getUi().showModelessDialog(page, 'Veille hôtels Luchon');
 }
 
 function menuCle() {
@@ -214,6 +216,9 @@ function collecteAutomatique() {
 function collecteALouverture() {
   rangerCleDesReglages();
   const cfg = lireReglages();
+  if (cfg.tableau_a_l_ouverture) {
+    try { ouvrirTableauDeBord(); return; } catch (e) { console.log('Tableau de bord impossible à ouvrir : ' + e.message); }
+  }
   if (!cfg.a_l_ouverture || !cle() || derniereCollecte() === aujourdhui()) return;
   message('Collecte du jour en cours (environ 1 minute)…', 60);
   const r = collecter({});
@@ -236,20 +241,59 @@ function doGet() {
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
-/** Données pour la page web : toutes les lignes des 4 onglets, dates au format AAAA-MM-JJ. */
+/** Données du tableau de bord : relevés (dates en AAAA-MM-JJ), réglages, journal et état de la collecte. */
 function lireDonnees() {
+  const cfg = lireReglages();
+  const reglages = classeur().getSheetByName('Réglages');
   return {
-    prix: lireObjets('prix'), avis: lireObjets('avis'), hotels: lireObjets('hotels'),
-    usage: lireObjets('compteur'), urlClasseur: classeur().getUrl(),
+    prix: lireObjets('prix'), avis: lireObjets('avis'), hotels: lireObjets('hotels'), usage: lireObjets('compteur'),
+    reglages: {
+      hotels: cfg.hotels.map(h => h.nom),
+      dates: datesValides(cfg, []).map(d => ({ nom: d.nom, arrivee: d.arrivee })),
+      heure: cfg.heure, frequence_jours: cfg.frequence_jours, jour_fiches: cfg.jour_fiches,
+      a_l_ouverture: cfg.a_l_ouverture, quota: cfg.quota,
+    },
+    journal: lireJournal(15),
+    etat: {
+      cleOk: !!cle(), faite: derniereCollecte() === aujourdhui(), aOuverture: cfg.a_l_ouverture,
+      derniereCollecte: valeurReglage('Dernière collecte'), miseAJour: valeurReglage('Mise à jour du script'),
+    },
+    urlClasseur: classeur().getUrl(),
+    urlReglages: classeur().getUrl() + (reglages ? '#gid=' + reglages.getSheetId() : ''),
   };
+}
+
+function valeurReglage(libelle) {
+  const cellule = celluleReglage(libelle);
+  return cellule ? String(cellule.getDisplayValue()) : '';
+}
+
+/** Les dernières lignes de l'onglet Journal : [{ date, resultat, detail }]. */
+function lireJournal(n) {
+  const feuille = classeur().getSheetByName('Journal');
+  if (!feuille || feuille.getLastRow() < 2) return [];
+  return feuille.getRange(2, 1, Math.min(n, feuille.getLastRow() - 1), 3).getValues().map(l => ({
+    date: l[0] instanceof Date ? Utilities.formatDate(l[0], FUSEAU, 'dd/MM/yyyy HH:mm') : String(l[0]),
+    resultat: String(l[1]), detail: String(l[2]),
+  }));
 }
 
 function etatCollecte() {
   return { cleOk: !!cle(), faite: derniereCollecte() === aujourdhui(), aOuverture: lireReglages().a_l_ouverture };
 }
 
-function collecterDepuisPage(forcer) {
-  return collecter({ forcer: !!forcer });
+/**
+ * Actions du tableau de bord. Le chargeur ne transmet qu'un argument : soit vrai/faux (forcer la collecte),
+ * soit une demande { action: 'collecte' | 'auto' | 'essai' | 'fiches', hotel }.
+ */
+function collecterDepuisPage(demande) {
+  if (demande && typeof demande === 'object') {
+    if (demande.action === 'essai') return collecter({ essai: true, hotel: String(demande.hotel || '').trim() });
+    if (demande.action === 'fiches') return collecter({ forcer: true, fiches: true });
+    if (demande.action === 'auto') return collecter({}); // ouverture du tableau de bord : respecte la fréquence
+    return collecter({ forcer: true });
+  }
+  return collecter({ forcer: !!demande });
 }
 
 
@@ -398,7 +442,8 @@ function collecterSansVerrou(opts, journal) {
     const resto = restauration(p);
     fiches.push({ date_maj: jour, hotel: h.nom, nom_google: p.name || '', categorie_etoiles: etoiles(p),
       restaurant_sur_place: resto[0], petit_dejeuner_propose: resto[1],
-      equipements_principaux: (p.amenities || []).slice(0, 12).join(', '), property_token: p.property_token || '' });
+      equipements_principaux: (p.amenities || []).slice(0, 12).join(', '), property_token: p.property_token || '',
+      photo: photo(p) });
   });
 
   const compteApres = lireCompte();
@@ -623,6 +668,11 @@ function notesDetaillees(fiche) {
   return morceaux.join(' ; ');
 }
 
+function photo(p) {
+  const image = (p.images || [])[0] || {};
+  return image.thumbnail || image.original_image || '';
+}
+
 function etoiles(p) {
   if (p.extracted_hotel_class) return p.extracted_hotel_class;
   const m = String(p.hotel_class || '').match(/\d/);
@@ -665,6 +715,7 @@ function lireReglages() {
     jour_fiches: String(parLibelle['Jour des fiches détaillées'] || 'lundi').toLowerCase().trim(),
     heure: nombre('Heure de la collecte automatique', 7),
     a_l_ouverture: String(parLibelle["Collecter à l'ouverture du classeur"] || 'oui').toLowerCase().trim().startsWith('o'),
+    tableau_a_l_ouverture: String(parLibelle["Ouvrir le tableau de bord à l'ouverture"] || 'oui').toLowerCase().trim().startsWith('o'),
     quota: nombre('Quota mensuel SerpApi', 250),
     marge: nombre('Réserve de requêtes', 15),
     pages_max: Math.max(1, nombre('Pages de résultats par date', 1)),
